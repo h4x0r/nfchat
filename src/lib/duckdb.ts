@@ -99,12 +99,32 @@ export async function loadCSVData(url: string): Promise<number> {
   return count;
 }
 
+/**
+ * Convert BigInt values to Numbers in query results.
+ * DuckDB returns BIGINT columns as JavaScript BigInt, but most
+ * JavaScript libraries (charts, etc.) expect regular numbers.
+ */
+function convertBigInts<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'bigint') return Number(obj) as T;
+  if (Array.isArray(obj)) return obj.map(convertBigInts) as T;
+  if (typeof obj === 'object') {
+    const result: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      result[key] = convertBigInts(value);
+    }
+    return result as T;
+  }
+  return obj;
+}
+
 export async function executeQuery<T = Record<string, unknown>>(
   sql: string
 ): Promise<T[]> {
   const connection = await getConnection();
   const result = await connection.query(sql);
-  return result.toArray() as T[];
+  const rows = result.toArray() as T[];
+  return convertBigInts(rows);
 }
 
 export async function getTimeRange(): Promise<{ min: number; max: number }> {
