@@ -223,7 +223,7 @@ export async function createConversation(params: CreateConversationParams): Prom
  * Get or create a conversation by session ID
  */
 export async function getOrCreateConversation(params: CreateConversationParams): Promise<Conversation> {
-  const { sessionId, userId } = params
+  const { sessionId } = params
 
   // First try to find existing
   const existing = await sql`
