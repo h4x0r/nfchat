@@ -17,6 +17,7 @@
     "generate:test-data": "tsx e2e/fixtures/generate-test-data.ts"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.71.2",
     "@duckdb/duckdb-wasm": "^1.33.1-dev16.0",
     "@radix-ui/react-label": "^2.1.8",
     "@radix-ui/react-scroll-area": "^1.2.10",
@@ -25,6 +26,7 @@
     "@radix-ui/react-slot": "^1.2.4",
     "@radix-ui/react-tabs": "^1.1.13",
     "@tanstack/react-table": "^8.21.3",
+    "@vercel/postgres": "^0.10.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.562.0",
@@ -32,6 +34,7 @@
     "react-dom": "^19.2.0",
     "react-force-graph-2d": "^1.29.0",
     "recharts": "^3.6.0",
+    "stripe": "^20.1.2",
     "tailwind-merge": "^3.4.0",
     "zustand": "^5.0.9"
   },
@@ -45,6 +48,7 @@
     "@types/node": "^24.10.4",
     "@types/react": "^19.2.5",
     "@types/react-dom": "^19.2.3",
+    "@vercel/node": "^5.5.16",
     "@vitejs/plugin-react": "^5.1.1",
     "@vitest/coverage-v8": "^4.0.16",
     "duckdb": "^1.4.3",
