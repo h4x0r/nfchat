@@ -1,13 +1,16 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { useStore } from '@/lib/store'
 import { useNetflowData } from '@/hooks/useNetflowData'
 import { Dashboard } from '@/components/Dashboard'
 import { Chat } from '@/components/Chat'
 import { Settings } from '@/components/Settings'
+import { FileUploader } from '@/components/FileUploader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Database, AlertCircle, Loader2, Settings as SettingsIcon } from 'lucide-react'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Database, AlertCircle, Loader2, Settings as SettingsIcon, Upload, Globe } from 'lucide-react'
 import { getApiKey } from '@/components/Settings'
+import { loadParquetFromFile } from '@/lib/duckdb'
 
 const PARQUET_URL = '/data/NF-UNSW-NB15-v3.parquet'
 
@@ -15,8 +18,25 @@ function App() {
   const [showChat, setShowChat] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [loadStarted, setLoadStarted] = useState(false)
+  const [localFileLoading, setLocalFileLoading] = useState(false)
+  const [localFileLoaded, setLocalFileLoaded] = useState(false)
+  const [localFileError, setLocalFileError] = useState<string | null>(null)
 
   const { loading, error } = useNetflowData(loadStarted ? PARQUET_URL : '')
+
+  const handleLocalFileSelect = useCallback(async (file: File) => {
+    setLocalFileLoading(true)
+    setLocalFileError(null)
+
+    try {
+      await loadParquetFromFile(file)
+      setLocalFileLoaded(true)
+    } catch (err) {
+      setLocalFileError(err instanceof Error ? err.message : 'Failed to load file')
+    } finally {
+      setLocalFileLoading(false)
+    }
+  }, [])
 
   const {
     messages,
@@ -63,11 +83,11 @@ function App() {
     }
   }
 
-  // Landing page - show load button
-  if (!loadStarted) {
+  // Landing page - show load options
+  if (!loadStarted && !localFileLoaded) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
+        <Card className="w-full max-w-lg">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Database className="h-5 w-5" />
@@ -75,23 +95,51 @@ function App() {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <p className="text-sm text-muted-foreground">
-              Load the NF-UNSW-NB15 netflow dataset to begin analysis.
-              The dataset contains ~2.3M flow records with 10 attack types.
-            </p>
+            <Tabs defaultValue="upload" className="w-full">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="upload">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload File
+                </TabsTrigger>
+                <TabsTrigger value="demo">
+                  <Globe className="h-4 w-4 mr-2" />
+                  Demo Data
+                </TabsTrigger>
+              </TabsList>
 
-            <Button onClick={handleLoadData} className="w-full">
-              Load Dataset
-            </Button>
+              <TabsContent value="upload" className="mt-4">
+                <FileUploader
+                  onFileSelect={handleLocalFileSelect}
+                  isLoading={localFileLoading}
+                />
+                {localFileError && (
+                  <div className="mt-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
+                    <p className="text-destructive text-sm">{localFileError}</p>
+                  </div>
+                )}
+              </TabsContent>
 
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => setShowSettings(true)}
-            >
-              <SettingsIcon className="h-4 w-4 mr-2" />
-              Configure API Key
-            </Button>
+              <TabsContent value="demo" className="mt-4">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Load the NF-UNSW-NB15 netflow dataset to begin analysis.
+                  The dataset contains ~2.3M flow records with 10 attack types.
+                </p>
+                <Button onClick={handleLoadData} className="w-full">
+                  Load Demo Dataset
+                </Button>
+              </TabsContent>
+            </Tabs>
+
+            <div className="pt-4 border-t">
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => setShowSettings(true)}
+              >
+                <SettingsIcon className="h-4 w-4 mr-2" />
+                Configure API Key
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -107,8 +155,8 @@ function App() {
     )
   }
 
-  // Loading state
-  if (loading) {
+  // Loading state (for both URL and local file)
+  if (loading || localFileLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -116,7 +164,9 @@ function App() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
             <p className="text-muted-foreground">Loading NetFlow data...</p>
             <p className="text-xs text-muted-foreground">
-              This may take 30-60 seconds for ~100MB of data
+              {localFileLoading
+                ? 'Processing your parquet file...'
+                : 'This may take 30-60 seconds for ~100MB of data'}
             </p>
           </CardContent>
         </Card>

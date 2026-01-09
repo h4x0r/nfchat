@@ -17,7 +17,7 @@ interface UseNetflowDataResult {
 }
 
 export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [totalRows, setTotalRows] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
@@ -61,7 +61,7 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
   }, [fetchDashboardData])
 
   useEffect(() => {
-    if (dataLoaded) return
+    if (dataLoaded || !parquetUrl) return
 
     async function loadData() {
       try {

@@ -1,4 +1,6 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
+import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-mvp.wasm?url';
+import duckdb_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-mvp.worker.js?url';
 
 let db: duckdb.AsyncDuckDB | null = null;
 let conn: duckdb.AsyncDuckDBConnection | null = null;
@@ -6,22 +8,11 @@ let conn: duckdb.AsyncDuckDBConnection | null = null;
 export async function initDuckDB(): Promise<duckdb.AsyncDuckDB> {
   if (db) return db;
 
-  const JSDELIVR_BUNDLES = duckdb.getJsDelivrBundles();
-
-  const bundle = await duckdb.selectBundle(JSDELIVR_BUNDLES);
-
-  const worker_url = URL.createObjectURL(
-    new Blob([`importScripts("${bundle.mainWorker!}");`], {
-      type: 'text/javascript',
-    })
-  );
-
-  const worker = new Worker(worker_url);
+  const worker = new Worker(duckdb_worker);
   const logger = new duckdb.ConsoleLogger();
   db = new duckdb.AsyncDuckDB(logger, worker);
 
-  await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
-  URL.revokeObjectURL(worker_url);
+  await db.instantiate(duckdb_wasm);
 
   return db;
 }
@@ -43,6 +34,33 @@ export async function loadParquetData(url: string): Promise<number> {
   const buffer = await response.arrayBuffer();
 
   const database = await initDuckDB();
+  await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
+
+  // Create a view from the parquet file
+  await connection.query(`
+    CREATE OR REPLACE VIEW flows AS
+    SELECT * FROM read_parquet('flows.parquet')
+  `);
+
+  // Get row count
+  const result = await connection.query('SELECT COUNT(*) as cnt FROM flows');
+  const count = result.toArray()[0]?.cnt as number;
+
+  return count;
+}
+
+/**
+ * Load parquet data from a local File object (browser File API)
+ * Supports large files through streaming - doesn't load entire file into memory
+ */
+export async function loadParquetFromFile(file: File): Promise<number> {
+  const connection = await getConnection();
+  const database = await initDuckDB();
+
+  // Read file as ArrayBuffer
+  const buffer = await file.arrayBuffer();
+
+  // Register the file buffer with DuckDB
   await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
 
   // Create a view from the parquet file

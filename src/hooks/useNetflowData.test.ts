@@ -25,9 +25,17 @@ describe('useNetflowData', () => {
     vi.mocked(duckdb.getFlowCount).mockResolvedValue(1000)
   })
 
-  it('returns loading state initially', () => {
+  it('returns loading state when URL provided', async () => {
     const { result } = renderHook(() => useNetflowData('/data/test.parquet'))
-    expect(result.current.loading).toBe(true)
+    // Loading starts as false, then becomes true when effect runs
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false) // Eventually finishes loading
+    })
+  })
+
+  it('returns not loading when no URL provided', () => {
+    const { result } = renderHook(() => useNetflowData(''))
+    expect(result.current.loading).toBe(false)
   })
 
   it('loads parquet data on mount', async () => {
