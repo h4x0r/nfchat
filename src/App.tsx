@@ -22,7 +22,7 @@ import {
   getFlowCount,
 } from '@/lib/duckdb'
 
-const PARQUET_URL = 'https://github.com/h4x0r/nfchat/releases/download/v0.1.0-data/NF-UNSW-NB15-v3.parquet'
+const PARQUET_URL = 'https://pub-d25007b87b76480b851d23d324d67505.r2.dev/NF-UNSW-NB15-v3.parquet'
 
 function App() {
   const [showChat, setShowChat] = useState(false)

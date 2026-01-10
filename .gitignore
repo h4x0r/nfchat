@@ -34,3 +34,4 @@ test-results/
 .vercel
 .env*.local
 .playwright-mcp/
+.wrangler/
