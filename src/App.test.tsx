@@ -26,6 +26,36 @@ describe('App', () => {
     vi.clearAllMocks()
   })
 
+  describe('demo data URL', () => {
+    it('uses external CDN URL to avoid build-time download', async () => {
+      const user = userEvent.setup()
+      let capturedUrl = ''
+
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
+        capturedUrl = url
+        return {
+          loading: false,
+          error: null,
+          totalRows: 0,
+          progress: { stage: '', percent: 0 },
+          refresh: vi.fn(),
+        }
+      })
+
+      render(<App />)
+
+      const demoTab = screen.getByRole('tab', { name: /demo data/i })
+      await user.click(demoTab)
+
+      const loadButton = await screen.findByRole('button', { name: /load demo dataset/i })
+      await user.click(loadButton)
+
+      await waitFor(() => {
+        expect(capturedUrl).toMatch(/^https:\/\//)
+      })
+    })
+  })
+
   describe('loading state with progress bar', () => {
     it('shows progress bar when loading demo data', async () => {
       const user = userEvent.setup()
