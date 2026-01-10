@@ -189,7 +189,7 @@ export async function loadZipFile(file: File): Promise<number> {
     const data = files[parquetFile];
 
     // Validate parquet
-    validateParquetFile(data.buffer);
+    validateParquetFile(data.buffer as ArrayBuffer);
 
     await database.registerFileBuffer('flows.parquet', data);
     await connection.query(`
