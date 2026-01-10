@@ -37,7 +37,8 @@ describe('App', () => {
           loading: false,
           error: null,
           totalRows: 0,
-          progress: { stage: '', percent: 0 },
+          progress: { stage: 'initializing', percent: 0, message: '', timestamp: Date.now() },
+          logs: [],
           refresh: vi.fn(),
         }
       })
@@ -67,7 +68,8 @@ describe('App', () => {
             loading: true,
             error: null,
             totalRows: 0,
-            progress: { stage: 'Loading data...', percent: 50 },
+            progress: { stage: 'downloading', percent: 50, message: 'Loading data...', timestamp: Date.now() },
+            logs: [],
             refresh: vi.fn(),
           }
         }
@@ -75,7 +77,8 @@ describe('App', () => {
           loading: false,
           error: null,
           totalRows: 0,
-          progress: { stage: '', percent: 0 },
+          progress: { stage: 'initializing', percent: 0, message: '', timestamp: Date.now() },
+          logs: [],
           refresh: vi.fn(),
         }
       })
@@ -93,6 +96,9 @@ describe('App', () => {
       await waitFor(() => {
         expect(screen.getByRole('progressbar')).toBeInTheDocument()
       })
+      // LoadingProgress displays stageLabels[stage] as the stage header
+      expect(screen.getByText('Downloading')).toBeInTheDocument()
+      // And the message as supplementary text
       expect(screen.getByText('Loading data...')).toBeInTheDocument()
     })
 
@@ -105,7 +111,8 @@ describe('App', () => {
             loading: true,
             error: null,
             totalRows: 0,
-            progress: { stage: 'Building dashboard...', percent: 70 },
+            progress: { stage: 'building', percent: 70, message: 'Building dashboard...', timestamp: Date.now() },
+            logs: [],
             refresh: vi.fn(),
           }
         }
@@ -113,7 +120,8 @@ describe('App', () => {
           loading: false,
           error: null,
           totalRows: 0,
-          progress: { stage: '', percent: 0 },
+          progress: { stage: 'initializing', percent: 0, message: '', timestamp: Date.now() },
+          logs: [],
           refresh: vi.fn(),
         }
       })
@@ -129,8 +137,10 @@ describe('App', () => {
       await user.click(loadButton)
 
       await waitFor(() => {
-        expect(screen.getByText('Building dashboard...')).toBeInTheDocument()
+        // LoadingProgress displays "Building Dashboard" for the 'building' stage
+        expect(screen.getByText('Building Dashboard')).toBeInTheDocument()
       })
+      expect(screen.getByText('Building dashboard...')).toBeInTheDocument()
     })
   })
 })

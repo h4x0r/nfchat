@@ -8,18 +8,22 @@ import {
   getFlowCount,
 } from '@/lib/duckdb'
 import { useStore } from '@/lib/store'
-
-export interface LoadingProgress {
-  stage: string
-  percent: number
-}
+import type { ProgressEvent, LogEntry } from '@/lib/progress'
 
 interface UseNetflowDataResult {
   loading: boolean
   error: string | null
   totalRows: number
-  progress: LoadingProgress
+  progress: ProgressEvent
+  logs: LogEntry[]
   refresh: (whereClause?: string) => Promise<void>
+}
+
+const initialProgress: ProgressEvent = {
+  stage: 'initializing',
+  percent: 0,
+  message: '',
+  timestamp: Date.now(),
 }
 
 export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
@@ -27,7 +31,8 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
   const [error, setError] = useState<string | null>(null)
   const [totalRows, setTotalRows] = useState(0)
   const [dataLoaded, setDataLoaded] = useState(false)
-  const [progress, setProgress] = useState<LoadingProgress>({ stage: '', percent: 0 })
+  const [progress, setProgress] = useState<ProgressEvent>(initialProgress)
+  const [logs, setLogs] = useState<LogEntry[]>([])
 
   const {
     setTimelineData,
@@ -37,6 +42,10 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
     setFlows,
     setTotalFlowCount,
   } = useStore()
+
+  const addLog = useCallback((entry: LogEntry) => {
+    setLogs((prev) => [...prev, entry])
+  }, [])
 
   const fetchDashboardData = useCallback(async (whereClause: string = '1=1') => {
     try {
@@ -70,47 +79,75 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
   useEffect(() => {
     if (dataLoaded || !parquetUrl) return
 
-    // Small delay to allow React to render progress updates
-    const tick = () => new Promise((r) => setTimeout(r, 0))
-
     async function loadData() {
       try {
         setLoading(true)
         setError(null)
+        setLogs([])
 
-        // Stage 1: Initialize
-        setProgress({ stage: 'Initializing DuckDB...', percent: 20 })
-        await tick()
-
-        // Stage 2: Load parquet file
-        setProgress({ stage: 'Loading data...', percent: 40 })
-        await tick()
-        const rowCount = await loadParquetData(parquetUrl)
+        // Load parquet with progress tracking
+        const rowCount = await loadParquetData(parquetUrl, {
+          onProgress: setProgress,
+          onLog: addLog,
+        })
         setTotalRows(rowCount)
 
-        // Stage 3: Build dashboard
-        setProgress({ stage: 'Building dashboard...', percent: 70 })
-        await tick()
+        // Build dashboard
+        setProgress({
+          stage: 'building',
+          percent: 96,
+          message: 'Building dashboard visualizations...',
+          timestamp: Date.now(),
+        })
+        addLog({
+          level: 'info',
+          message: 'Building dashboard visualizations',
+          timestamp: Date.now(),
+        })
+
         await fetchDashboardData()
 
         // Complete
-        setProgress({ stage: 'Complete', percent: 100 })
+        setProgress({
+          stage: 'complete',
+          percent: 100,
+          message: `Ready - ${rowCount.toLocaleString()} flows loaded`,
+          timestamp: Date.now(),
+        })
+        addLog({
+          level: 'info',
+          message: `Dashboard ready with ${rowCount.toLocaleString()} flows`,
+          timestamp: Date.now(),
+        })
         setDataLoaded(true)
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'Unknown error')
+        const message = err instanceof Error ? err.message : 'Unknown error'
+        setError(message)
+        setProgress({
+          stage: 'error',
+          percent: 0,
+          message,
+          timestamp: Date.now(),
+        })
+        addLog({
+          level: 'error',
+          message: `Error: ${message}`,
+          timestamp: Date.now(),
+        })
       } finally {
         setLoading(false)
       }
     }
 
     loadData()
-  }, [parquetUrl, dataLoaded, fetchDashboardData])
+  }, [parquetUrl, dataLoaded, fetchDashboardData, addLog])
 
   return {
     loading,
     error,
     totalRows,
     progress,
+    logs,
     refresh,
   }
 }

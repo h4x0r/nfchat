@@ -2,6 +2,13 @@ import * as duckdb from '@duckdb/duckdb-wasm';
 import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import duckdb_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
 import { unzipSync } from 'fflate';
+import {
+  fetchWithProgress,
+  formatBytes,
+  type ProgressCallback,
+  type LogCallback,
+  createProgressTracker,
+} from './progress';
 
 let db: duckdb.AsyncDuckDB | null = null;
 let conn: duckdb.AsyncDuckDBConnection | null = null;
@@ -56,30 +63,78 @@ export async function getConnection(): Promise<duckdb.AsyncDuckDBConnection> {
   return conn;
 }
 
-export async function loadParquetData(url: string): Promise<number> {
-  const connection = await getConnection();
+export interface LoadDataOptions {
+  onProgress?: ProgressCallback
+  onLog?: LogCallback
+}
 
-  // Register the parquet file from URL
-  const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
+export async function loadParquetData(
+  url: string,
+  options?: LoadDataOptions
+): Promise<number> {
+  const { onProgress, onLog } = options ?? {}
+  const tracker = onProgress ? createProgressTracker(onProgress, onLog) : null
 
-  // Validate before registering
-  validateParquetFile(buffer);
+  // Stage 1: Initialize DuckDB
+  tracker?.emit('initializing', 5, 'Initializing DuckDB WASM...')
+  tracker?.log('info', 'Initializing DuckDB WASM engine')
+  const connection = await getConnection()
+  const database = await initDuckDB()
+  tracker?.log('info', 'DuckDB initialized')
 
-  const database = await initDuckDB();
-  await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
+  // Stage 2: Download file with progress
+  tracker?.emit('downloading', 10, 'Starting download...')
+  tracker?.log('info', `Fetching ${url}`)
 
-  // Create a table from the parquet file (materialized for fast queries)
+  let buffer: ArrayBuffer | null = null
+
+  if (tracker) {
+    buffer = await fetchWithProgress(url, (loaded, total) => {
+      const percent = total > 0 ? Math.round((loaded / total) * 50) + 10 : 30
+      const loadedStr = formatBytes(loaded)
+      const totalStr = total > 0 ? formatBytes(total) : 'unknown'
+      tracker.emit('downloading', Math.min(percent, 60), `Downloading: ${loadedStr} / ${totalStr}`, {
+        bytesLoaded: loaded,
+        bytesTotal: total,
+      })
+    })
+    tracker.log('info', `Download complete: ${formatBytes(buffer.byteLength)}`)
+  } else {
+    const response = await fetch(url)
+    buffer = await response.arrayBuffer()
+  }
+
+  // Stage 3: Validate parquet
+  tracker?.emit('parsing', 65, 'Validating parquet file...')
+  tracker?.log('info', 'Validating parquet magic bytes')
+  validateParquetFile(buffer)
+  tracker?.log('info', 'Parquet validation passed')
+
+  // Stage 4: Register with DuckDB
+  tracker?.emit('parsing', 70, 'Registering file with DuckDB...')
+  tracker?.log('info', 'Registering file buffer')
+  await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer))
+
+  // Release buffer reference to allow GC before CREATE TABLE (memory-intensive)
+  buffer = null
+
+  // Stage 5: Create table (this is the slow part for large files)
+  tracker?.emit('parsing', 75, 'Creating table from parquet...')
+  tracker?.log('info', 'Executing CREATE TABLE (this may take a while for large files)')
   await connection.query(`
     CREATE OR REPLACE TABLE flows AS
     SELECT * FROM read_parquet('flows.parquet')
-  `);
+  `)
+  tracker?.log('info', 'Table created successfully')
 
-  // Get row count
-  const result = await connection.query('SELECT COUNT(*) as cnt FROM flows');
-  const count = result.toArray()[0]?.cnt as number;
+  // Stage 6: Get row count
+  tracker?.emit('parsing', 95, 'Counting rows...')
+  const result = await connection.query('SELECT COUNT(*) as cnt FROM flows')
+  const count = result.toArray()[0]?.cnt as number
+  tracker?.log('info', `Loaded ${count.toLocaleString()} rows`)
 
-  return count;
+  tracker?.emit('complete', 100, `Loaded ${count.toLocaleString()} rows`)
+  return count
 }
 
 /**
@@ -91,13 +146,16 @@ export async function loadParquetFromFile(file: File): Promise<number> {
   const database = await initDuckDB();
 
   // Read file as ArrayBuffer
-  const buffer = await file.arrayBuffer();
+  let buffer: ArrayBuffer | null = await file.arrayBuffer();
 
   // Validate before registering
   validateParquetFile(buffer);
 
   // Register the file buffer with DuckDB
   await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
+
+  // Release buffer reference to allow GC before CREATE TABLE (memory-intensive)
+  buffer = null;
 
   // Create a table from the parquet file (materialized for fast queries)
   await connection.query(`
@@ -117,10 +175,13 @@ export async function loadCSVData(url: string): Promise<number> {
 
   // Register the CSV file from URL
   const response = await fetch(url);
-  const buffer = await response.arrayBuffer();
+  let buffer: ArrayBuffer | null = await response.arrayBuffer();
 
   const database = await initDuckDB();
   await database.registerFileBuffer('flows.csv', new Uint8Array(buffer));
+
+  // Release buffer reference to allow GC before CREATE TABLE (memory-intensive)
+  buffer = null;
 
   // Create a table from the CSV file (materialized for fast queries)
   await connection.query(`
@@ -143,10 +204,13 @@ export async function loadCSVFromFile(file: File): Promise<number> {
   const database = await initDuckDB();
 
   // Read file as ArrayBuffer
-  const buffer = await file.arrayBuffer();
+  let buffer: ArrayBuffer | null = await file.arrayBuffer();
 
   // Register the file buffer with DuckDB
   await database.registerFileBuffer('flows.csv', new Uint8Array(buffer));
+
+  // Release buffer reference to allow GC before CREATE TABLE (memory-intensive)
+  buffer = null;
 
   // Create a table from the CSV file (materialized for fast queries)
   await connection.query(`
@@ -170,11 +234,18 @@ export async function loadZipFile(file: File): Promise<number> {
   const database = await initDuckDB();
 
   // Read file as ArrayBuffer
-  const buffer = await file.arrayBuffer();
-  const zipData = new Uint8Array(buffer);
+  let buffer: ArrayBuffer | null = await file.arrayBuffer();
+  let zipData: Uint8Array | null = new Uint8Array(buffer);
+
+  // Release original buffer immediately after creating Uint8Array
+  buffer = null;
 
   // Extract ZIP contents
-  const files = unzipSync(zipData);
+  let files: ReturnType<typeof unzipSync> | null = unzipSync(zipData);
+
+  // Release zip data after extraction
+  zipData = null;
+
   const fileNames = Object.keys(files);
 
   // Find data files (prefer parquet, then csv)
@@ -192,6 +263,10 @@ export async function loadZipFile(file: File): Promise<number> {
     validateParquetFile(data.buffer as ArrayBuffer);
 
     await database.registerFileBuffer('flows.parquet', data);
+
+    // Release extracted files to allow GC before CREATE TABLE
+    files = null;
+
     await connection.query(`
       CREATE OR REPLACE TABLE flows AS
       SELECT * FROM read_parquet('flows.parquet')
@@ -199,6 +274,10 @@ export async function loadZipFile(file: File): Promise<number> {
   } else if (csvFile) {
     const data = files[csvFile];
     await database.registerFileBuffer('flows.csv', data);
+
+    // Release extracted files to allow GC before CREATE TABLE
+    files = null;
+
     await connection.query(`
       CREATE OR REPLACE TABLE flows AS
       SELECT * FROM read_csv('flows.csv', auto_detect=true)

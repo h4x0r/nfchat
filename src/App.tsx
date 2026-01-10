@@ -8,7 +8,7 @@ import { FileUploader, type FileType } from '@/components/FileUploader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Progress } from '@/components/ui/progress'
+import { LoadingProgress } from '@/components/LoadingProgress'
 import { Database, AlertCircle, Settings as SettingsIcon, Upload, Globe } from 'lucide-react'
 import { getApiKey } from '@/components/Settings'
 import {
@@ -32,9 +32,14 @@ function App() {
   const [localFileLoaded, setLocalFileLoaded] = useState(false)
   const [localFileError, setLocalFileError] = useState<string | null>(null)
   // Local file progress (currently not tracked, but used for unified loading UI)
-  const localProgress = { stage: 'Loading file...', percent: 0 }
+  const localProgress = {
+    stage: 'parsing' as const,
+    percent: 50,
+    message: 'Processing local file...',
+    timestamp: Date.now(),
+  }
 
-  const { loading, error, progress } = useNetflowData(loadStarted ? PARQUET_URL : '')
+  const { loading, error, progress, logs } = useNetflowData(loadStarted ? PARQUET_URL : '')
 
   const {
     messages,
@@ -208,18 +213,18 @@ function App() {
   // Loading state (for both URL and local file)
   if (loading || localFileLoading) {
     const currentProgress = localFileLoading ? localProgress : progress
+    const currentLogs = localFileLoading ? [] : logs
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
-          <CardContent className="py-8 flex flex-col items-center gap-4">
-            <Database className="h-8 w-8 text-primary" />
-            <p className="text-muted-foreground font-medium">Loading NetFlow data...</p>
-            <div className="w-full space-y-2">
-              <Progress value={currentProgress.percent} />
-              <p className="text-xs text-muted-foreground text-center">
-                {currentProgress.stage || 'Initializing...'}
-              </p>
-            </div>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Database className="h-5 w-5" />
+              Loading NetFlow Data
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <LoadingProgress progress={currentProgress} logs={currentLogs} />
           </CardContent>
         </Card>
       </div>

@@ -42,7 +42,13 @@ describe('useNetflowData', () => {
     renderHook(() => useNetflowData('/data/test.parquet'))
 
     await waitFor(() => {
-      expect(duckdb.loadParquetData).toHaveBeenCalledWith('/data/test.parquet')
+      expect(duckdb.loadParquetData).toHaveBeenCalledWith(
+        '/data/test.parquet',
+        expect.objectContaining({
+          onProgress: expect.any(Function),
+          onLog: expect.any(Function),
+        })
+      )
     })
   })
 
@@ -112,7 +118,10 @@ describe('useNetflowData', () => {
   describe('progress tracking', () => {
     it('returns progress object with stage and percent', () => {
       const { result } = renderHook(() => useNetflowData(''))
-      expect(result.current.progress).toEqual({ stage: '', percent: 0 })
+      expect(result.current.progress).toMatchObject({
+        stage: 'initializing',
+        percent: 0,
+      })
     })
 
     it('updates progress through loading stages', async () => {
@@ -121,8 +130,13 @@ describe('useNetflowData', () => {
       // Wait for progress to complete (progress is set before loading becomes false)
       await waitFor(() => {
         expect(result.current.progress.percent).toBe(100)
-        expect(result.current.progress.stage).toBe('Complete')
+        expect(result.current.progress.stage).toBe('complete')
       })
+    })
+
+    it('returns logs array', () => {
+      const { result } = renderHook(() => useNetflowData(''))
+      expect(result.current.logs).toEqual([])
     })
   })
 })
