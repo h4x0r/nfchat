@@ -3,8 +3,6 @@ import {
   createProgressTracker,
   fetchWithProgress,
   formatBytes,
-  type ProgressEvent,
-  type LogEntry,
 } from './progress'
 
 describe('progress', () => {

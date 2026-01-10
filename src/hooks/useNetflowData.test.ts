@@ -144,7 +144,6 @@ describe('useNetflowData', () => {
     it('shows time-proportional progress based on query weights', async () => {
       // Timeline is weighted at 50%, so after it completes, progress should be ~98%
       // (96 + 50/100 * 4 = 98)
-      const progressPercents: number[] = []
 
       vi.mocked(duckdb.loadParquetData).mockImplementation(async (_url, options) => {
         // Simulate reaching building stage at 96%

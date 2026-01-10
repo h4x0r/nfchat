@@ -43,7 +43,8 @@ export function LoadingProgress({ progress, logs }: LoadingProgressProps) {
   }, [logs.length])
 
   const stageLabel = stageLabels[progress.stage]
-  const colorClass = stageColors[progress.stage]
+  // colorClass reserved for future use with colored progress bars
+  void stageColors[progress.stage]
 
   return (
     <div className="w-full space-y-4">
