@@ -70,6 +70,9 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
   useEffect(() => {
     if (dataLoaded || !parquetUrl) return
 
+    // Small delay to allow React to render progress updates
+    const tick = () => new Promise((r) => setTimeout(r, 0))
+
     async function loadData() {
       try {
         setLoading(true)
@@ -77,14 +80,17 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
 
         // Stage 1: Initialize
         setProgress({ stage: 'Initializing DuckDB...', percent: 20 })
+        await tick()
 
         // Stage 2: Load parquet file
         setProgress({ stage: 'Loading data...', percent: 40 })
+        await tick()
         const rowCount = await loadParquetData(parquetUrl)
         setTotalRows(rowCount)
 
         // Stage 3: Build dashboard
         setProgress({ stage: 'Building dashboard...', percent: 70 })
+        await tick()
         await fetchDashboardData()
 
         // Complete
