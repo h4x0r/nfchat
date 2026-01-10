@@ -35,10 +35,10 @@ describe('FileUploader', () => {
   })
 
   describe('file selection', () => {
-    it('has file input that accepts parquet files', () => {
+    it('has file input that accepts parquet, csv, and zip files', () => {
       render(<FileUploader {...defaultProps} />)
       const input = screen.getByTestId('file-input')
-      expect(input).toHaveAttribute('accept', '.parquet')
+      expect(input).toHaveAttribute('accept', '.parquet,.csv,.zip')
     })
 
     it('shows selected file name after selection', async () => {
@@ -81,7 +81,7 @@ describe('FileUploader', () => {
       expect(button).not.toBeDisabled()
     })
 
-    it('calls onFileSelect when load button clicked', () => {
+    it('calls onFileSelect with file and fileType when load button clicked', () => {
       render(<FileUploader {...defaultProps} />)
       const input = screen.getByTestId('file-input') as HTMLInputElement
 
@@ -91,7 +91,33 @@ describe('FileUploader', () => {
       const button = screen.getByRole('button', { name: /load/i })
       fireEvent.click(button)
 
-      expect(mockOnFileSelect).toHaveBeenCalledWith(file)
+      expect(mockOnFileSelect).toHaveBeenCalledWith(file, 'parquet')
+    })
+
+    it('calls onFileSelect with csv fileType for csv files', () => {
+      render(<FileUploader {...defaultProps} />)
+      const input = screen.getByTestId('file-input') as HTMLInputElement
+
+      const file = new File(['test'], 'data.csv', { type: 'text/csv' })
+      fireEvent.change(input, { target: { files: [file] } })
+
+      const button = screen.getByRole('button', { name: /load/i })
+      fireEvent.click(button)
+
+      expect(mockOnFileSelect).toHaveBeenCalledWith(file, 'csv')
+    })
+
+    it('calls onFileSelect with zip fileType for zip files', () => {
+      render(<FileUploader {...defaultProps} />)
+      const input = screen.getByTestId('file-input') as HTMLInputElement
+
+      const file = new File(['test'], 'data.zip', { type: 'application/zip' })
+      fireEvent.change(input, { target: { files: [file] } })
+
+      const button = screen.getByRole('button', { name: /load/i })
+      fireEvent.click(button)
+
+      expect(mockOnFileSelect).toHaveBeenCalledWith(file, 'zip')
     })
   })
 
@@ -114,15 +140,15 @@ describe('FileUploader', () => {
       expect(screen.queryByTestId('error-message')).not.toBeInTheDocument()
     })
 
-    it('shows error for non-parquet files', () => {
+    it('shows error for unsupported file types', () => {
       render(<FileUploader {...defaultProps} />)
       const input = screen.getByTestId('file-input') as HTMLInputElement
 
-      const file = new File(['test'], 'data.csv', { type: 'text/csv' })
+      const file = new File(['test'], 'data.txt', { type: 'text/plain' })
       fireEvent.change(input, { target: { files: [file] } })
 
       expect(screen.getByTestId('error-message')).toBeInTheDocument()
-      expect(screen.getByText(/parquet files only/i)).toBeInTheDocument()
+      expect(screen.getByText(/unsupported file type/i)).toBeInTheDocument()
     })
   })
 

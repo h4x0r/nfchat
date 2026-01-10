@@ -1,32 +1,48 @@
 /**
- * FileUploader - Local file picker for parquet files
+ * FileUploader - Local file picker for data files
  *
  * Features:
  * - Drag and drop support
- * - File validation (parquet only)
+ * - File validation (.parquet, .csv, .zip)
  * - No server required - loads directly into browser
  */
 
 import { useState, useRef, useCallback } from 'react'
 
+const SUPPORTED_EXTENSIONS = ['.parquet', '.csv', '.zip']
+
+export type FileType = 'parquet' | 'csv' | 'zip'
+
 export interface FileUploaderProps {
-  onFileSelect: (file: File) => void
+  onFileSelect: (file: File, fileType: FileType) => void
   isLoading?: boolean
+}
+
+function getFileType(filename: string): FileType | null {
+  const lower = filename.toLowerCase()
+  if (lower.endsWith('.parquet')) return 'parquet'
+  if (lower.endsWith('.csv')) return 'csv'
+  if (lower.endsWith('.zip')) return 'zip'
+  return null
 }
 
 export function FileUploader({ onFileSelect, isLoading = false }: FileUploaderProps) {
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [fileType, setFileType] = useState<FileType | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const validateFile = (file: File): boolean => {
-    if (!file.name.endsWith('.parquet')) {
-      setError('Parquet files only. Please select a .parquet file.')
+    const type = getFileType(file.name)
+    if (!type) {
+      setError(`Unsupported file type. Please select a ${SUPPORTED_EXTENSIONS.join(', ')} file.`)
       setSelectedFile(null)
+      setFileType(null)
       return false
     }
     setError(null)
+    setFileType(type)
     return true
   }
 
@@ -40,10 +56,10 @@ export function FileUploader({ onFileSelect, isLoading = false }: FileUploaderPr
   }, [])
 
   const handleLoad = useCallback(() => {
-    if (selectedFile) {
-      onFileSelect(selectedFile)
+    if (selectedFile && fileType) {
+      onFileSelect(selectedFile, fileType)
     }
-  }, [selectedFile, onFileSelect])
+  }, [selectedFile, fileType, onFileSelect])
 
   const handleDrop = useCallback((event: React.DragEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -97,7 +113,7 @@ export function FileUploader({ onFileSelect, isLoading = false }: FileUploaderPr
           ref={fileInputRef}
           type="file"
           data-testid="file-input"
-          accept=".parquet"
+          accept=".parquet,.csv,.zip"
           onChange={handleFileSelect}
           className="hidden"
         />
@@ -122,7 +138,7 @@ export function FileUploader({ onFileSelect, isLoading = false }: FileUploaderPr
           Drag & Drop or Click to Select
         </p>
         <p className="text-muted-foreground text-sm mt-1">
-          Supported: Parquet files
+          Supported: .parquet, .csv, .zip
         </p>
       </div>
 

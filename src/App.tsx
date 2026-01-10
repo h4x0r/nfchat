@@ -4,7 +4,7 @@ import { useNetflowData } from '@/hooks/useNetflowData'
 import { Dashboard } from '@/components/Dashboard'
 import { Chat } from '@/components/Chat'
 import { Settings } from '@/components/Settings'
-import { FileUploader } from '@/components/FileUploader'
+import { FileUploader, type FileType } from '@/components/FileUploader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -12,6 +12,8 @@ import { Database, AlertCircle, Loader2, Settings as SettingsIcon, Upload, Globe
 import { getApiKey } from '@/components/Settings'
 import {
   loadParquetFromFile,
+  loadCSVFromFile,
+  loadZipFile,
   getTimelineData,
   getAttackDistribution,
   getTopTalkers,
@@ -44,13 +46,23 @@ function App() {
     setTotalFlowCount,
   } = useStore()
 
-  const handleLocalFileSelect = useCallback(async (file: File) => {
+  const handleLocalFileSelect = useCallback(async (file: File, fileType: FileType) => {
     setLocalFileLoading(true)
     setLocalFileError(null)
 
     try {
-      // Load the parquet file into DuckDB
-      await loadParquetFromFile(file)
+      // Load the file into DuckDB based on type
+      switch (fileType) {
+        case 'parquet':
+          await loadParquetFromFile(file)
+          break
+        case 'csv':
+          await loadCSVFromFile(file)
+          break
+        case 'zip':
+          await loadZipFile(file)
+          break
+      }
 
       // Fetch dashboard data and populate the store
       const [timeline, attacks, srcIPs, dstIPs, flows, flowCount] = await Promise.all([

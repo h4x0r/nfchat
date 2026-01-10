@@ -1,6 +1,7 @@
 import * as duckdb from '@duckdb/duckdb-wasm';
 import duckdb_wasm from '@duckdb/duckdb-wasm/dist/duckdb-eh.wasm?url';
 import duckdb_worker from '@duckdb/duckdb-wasm/dist/duckdb-browser-eh.worker.js?url';
+import { unzipSync } from 'fflate';
 
 let db: duckdb.AsyncDuckDB | null = null;
 let conn: duckdb.AsyncDuckDBConnection | null = null;
@@ -68,9 +69,9 @@ export async function loadParquetData(url: string): Promise<number> {
   const database = await initDuckDB();
   await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
 
-  // Create a view from the parquet file
+  // Create a table from the parquet file (materialized for fast queries)
   await connection.query(`
-    CREATE OR REPLACE VIEW flows AS
+    CREATE OR REPLACE TABLE flows AS
     SELECT * FROM read_parquet('flows.parquet')
   `);
 
@@ -98,9 +99,9 @@ export async function loadParquetFromFile(file: File): Promise<number> {
   // Register the file buffer with DuckDB
   await database.registerFileBuffer('flows.parquet', new Uint8Array(buffer));
 
-  // Create a view from the parquet file
+  // Create a table from the parquet file (materialized for fast queries)
   await connection.query(`
-    CREATE OR REPLACE VIEW flows AS
+    CREATE OR REPLACE TABLE flows AS
     SELECT * FROM read_parquet('flows.parquet')
   `);
 
@@ -121,11 +122,92 @@ export async function loadCSVData(url: string): Promise<number> {
   const database = await initDuckDB();
   await database.registerFileBuffer('flows.csv', new Uint8Array(buffer));
 
-  // Create a view from the CSV file
+  // Create a table from the CSV file (materialized for fast queries)
   await connection.query(`
-    CREATE OR REPLACE VIEW flows AS
+    CREATE OR REPLACE TABLE flows AS
     SELECT * FROM read_csv('flows.csv', auto_detect=true)
   `);
+
+  // Get row count
+  const result = await connection.query('SELECT COUNT(*) as cnt FROM flows');
+  const count = result.toArray()[0]?.cnt as number;
+
+  return count;
+}
+
+/**
+ * Load CSV data from a local File object (browser File API)
+ */
+export async function loadCSVFromFile(file: File): Promise<number> {
+  const connection = await getConnection();
+  const database = await initDuckDB();
+
+  // Read file as ArrayBuffer
+  const buffer = await file.arrayBuffer();
+
+  // Register the file buffer with DuckDB
+  await database.registerFileBuffer('flows.csv', new Uint8Array(buffer));
+
+  // Create a table from the CSV file (materialized for fast queries)
+  await connection.query(`
+    CREATE OR REPLACE TABLE flows AS
+    SELECT * FROM read_csv('flows.csv', auto_detect=true)
+  `);
+
+  // Get row count
+  const result = await connection.query('SELECT COUNT(*) as cnt FROM flows');
+  const count = result.toArray()[0]?.cnt as number;
+
+  return count;
+}
+
+/**
+ * Load data from a ZIP file (browser File API)
+ * Extracts the ZIP and looks for .parquet or .csv files inside
+ */
+export async function loadZipFile(file: File): Promise<number> {
+  const connection = await getConnection();
+  const database = await initDuckDB();
+
+  // Read file as ArrayBuffer
+  const buffer = await file.arrayBuffer();
+  const zipData = new Uint8Array(buffer);
+
+  // Extract ZIP contents
+  const files = unzipSync(zipData);
+  const fileNames = Object.keys(files);
+
+  // Find data files (prefer parquet, then csv)
+  const parquetFile = fileNames.find(name =>
+    name.toLowerCase().endsWith('.parquet') && !name.startsWith('__MACOSX')
+  );
+  const csvFile = fileNames.find(name =>
+    name.toLowerCase().endsWith('.csv') && !name.startsWith('__MACOSX')
+  );
+
+  if (parquetFile) {
+    const data = files[parquetFile];
+
+    // Validate parquet
+    validateParquetFile(data.buffer);
+
+    await database.registerFileBuffer('flows.parquet', data);
+    await connection.query(`
+      CREATE OR REPLACE TABLE flows AS
+      SELECT * FROM read_parquet('flows.parquet')
+    `);
+  } else if (csvFile) {
+    const data = files[csvFile];
+    await database.registerFileBuffer('flows.csv', data);
+    await connection.query(`
+      CREATE OR REPLACE TABLE flows AS
+      SELECT * FROM read_csv('flows.csv', auto_detect=true)
+    `);
+  } else {
+    throw new Error(
+      'No data file found in ZIP. Please ensure the ZIP contains a .parquet or .csv file.'
+    );
+  }
 
   // Get row count
   const result = await connection.query('SELECT COUNT(*) as cnt FROM flows');
