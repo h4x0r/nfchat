@@ -1,0 +1,17 @@
+# Large data files
+datasets/
+*.parquet
+
+# Development
+node_modules/
+.git/
+.serena/
+
+# Test artifacts
+test-results/
+playwright-report/
+coverage/
+
+# Local config
+.env.local
+.env*.local
