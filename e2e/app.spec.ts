@@ -55,19 +55,19 @@ test.describe('nfchat App', () => {
       await expect(page.getByText('test-flows.parquet')).toBeVisible()
     })
 
-    test('shows error for non-parquet files', async ({ page }) => {
+    test('shows error for unsupported file types', async ({ page }) => {
       await page.goto('/')
 
-      // Create a fake CSV file
+      // Create an unsupported file type (.txt)
       const fileInput = page.getByTestId('file-input')
       await fileInput.setInputFiles({
-        name: 'test.csv',
-        mimeType: 'text/csv',
-        buffer: Buffer.from('a,b,c\n1,2,3'),
+        name: 'test.txt',
+        mimeType: 'text/plain',
+        buffer: Buffer.from('some text content'),
       })
 
-      // Should show error
-      await expect(page.getByText(/parquet files only/i)).toBeVisible()
+      // Should show error for unsupported file type
+      await expect(page.getByText(/unsupported file type/i)).toBeVisible()
     })
 
     test('enables load button after file selection', async ({ page }) => {
