@@ -15,10 +15,13 @@ describe('motherduck-auth', () => {
   beforeEach(() => {
     // Clear localStorage before each test
     localStorage.clear()
+    // Clear env var to isolate tests
+    vi.stubEnv('VITE_MOTHERDUCK_TOKEN', '')
   })
 
   afterEach(() => {
     localStorage.clear()
+    vi.unstubAllEnvs()
   })
 
   describe('getMotherDuckToken', () => {
