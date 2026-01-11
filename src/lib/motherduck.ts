@@ -374,81 +374,133 @@ export async function loadParquetData(
   options?: LoadDataOptions
 ): Promise<number> {
   const { onProgress, onLog } = options ?? {}
+  const maxRetries = 3
+  let lastError: Error | null = null
 
-  // Initialize connection
-  onProgress?.({
-    stage: 'initializing',
-    percent: 5,
-    message: 'Connecting to MotherDuck...',
-    timestamp: Date.now(),
-  })
-  onLog?.({
-    level: 'info',
-    message: 'Connecting to MotherDuck cloud',
-    timestamp: Date.now(),
-  })
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      // Initialize connection
+      onProgress?.({
+        stage: 'initializing',
+        percent: 5,
+        message: attempt > 1 ? `Reconnecting (attempt ${attempt}/${maxRetries})...` : 'Connecting to MotherDuck...',
+        timestamp: Date.now(),
+      })
+      onLog?.({
+        level: 'info',
+        message: attempt > 1 ? `Retry attempt ${attempt}/${maxRetries}` : 'Connecting to MotherDuck cloud',
+        timestamp: Date.now(),
+      })
 
-  const conn = await getConnection()
+      // Reset connection on retry
+      if (attempt > 1) {
+        resetConnection()
+      }
 
-  // MotherDuck can read directly from URLs
-  onProgress?.({
-    stage: 'downloading',
-    percent: 20,
-    message: 'Loading parquet from URL...',
-    timestamp: Date.now(),
-  })
-  onLog?.({
-    level: 'info',
-    message: `Fetching ${url}`,
-    timestamp: Date.now(),
-  })
+      const conn = await getConnection()
 
-  // Create table directly from URL (MotherDuck handles the download)
-  onProgress?.({
-    stage: 'parsing',
-    percent: 50,
-    message: 'Creating table from parquet...',
-    timestamp: Date.now(),
-  })
-  onLog?.({
-    level: 'info',
-    message: 'Executing CREATE TABLE (this may take a while for large files)',
-    timestamp: Date.now(),
-  })
+      // Start progress animation for long-running query
+      let progressPercent = 20
+      const progressInterval = setInterval(() => {
+        progressPercent = Math.min(progressPercent + 2, 85)
+        onProgress?.({
+          stage: 'downloading',
+          percent: progressPercent,
+          message: `Loading parquet data... ${progressPercent}%`,
+          timestamp: Date.now(),
+        })
+      }, 2000)
 
-  await conn.evaluateQuery(`
-    CREATE OR REPLACE TABLE flows AS
-    SELECT * FROM read_parquet('${url}')
-  `)
+      onProgress?.({
+        stage: 'downloading',
+        percent: 20,
+        message: 'Downloading parquet file...',
+        timestamp: Date.now(),
+      })
+      onLog?.({
+        level: 'info',
+        message: `Fetching ${url}`,
+        timestamp: Date.now(),
+      })
 
-  onLog?.({
-    level: 'info',
-    message: 'Table created successfully',
-    timestamp: Date.now(),
-  })
+      // Create table directly from URL (MotherDuck handles the download)
+      onLog?.({
+        level: 'info',
+        message: 'Creating table (this may take 1-2 minutes for large files)',
+        timestamp: Date.now(),
+      })
 
-  // Get row count
-  onProgress?.({
-    stage: 'parsing',
-    percent: 95,
-    message: 'Counting rows...',
-    timestamp: Date.now(),
-  })
+      try {
+        await conn.evaluateQuery(`
+          CREATE OR REPLACE TABLE flows AS
+          SELECT * FROM read_parquet('${url}')
+        `)
+      } finally {
+        clearInterval(progressInterval)
+      }
 
-  const count = await getFlowCount()
+      onProgress?.({
+        stage: 'parsing',
+        percent: 90,
+        message: 'Table created successfully',
+        timestamp: Date.now(),
+      })
+      onLog?.({
+        level: 'info',
+        message: 'Table created successfully',
+        timestamp: Date.now(),
+      })
 
-  onLog?.({
-    level: 'info',
-    message: `Loaded ${count.toLocaleString()} rows`,
-    timestamp: Date.now(),
-  })
+      // Get row count
+      onProgress?.({
+        stage: 'parsing',
+        percent: 95,
+        message: 'Counting rows...',
+        timestamp: Date.now(),
+      })
 
-  onProgress?.({
-    stage: 'complete',
-    percent: 100,
-    message: `Loaded ${count.toLocaleString()} rows`,
-    timestamp: Date.now(),
-  })
+      const count = await getFlowCount()
 
-  return count
+      onLog?.({
+        level: 'info',
+        message: `Loaded ${count.toLocaleString()} rows`,
+        timestamp: Date.now(),
+      })
+
+      onProgress?.({
+        stage: 'complete',
+        percent: 100,
+        message: `Loaded ${count.toLocaleString()} rows`,
+        timestamp: Date.now(),
+      })
+
+      return count
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err))
+      const isRetryable = lastError.message.includes('lease expired') ||
+                          lastError.message.includes('timeout') ||
+                          lastError.message.includes('connection')
+
+      onLog?.({
+        level: 'warning',
+        message: `Attempt ${attempt} failed: ${lastError.message}`,
+        timestamp: Date.now(),
+      })
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw lastError
+      }
+
+      // Wait before retry with exponential backoff
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 10000)
+      onLog?.({
+        level: 'info',
+        message: `Waiting ${delay / 1000}s before retry...`,
+        timestamp: Date.now(),
+      })
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+
+  throw lastError || new Error('Failed to load parquet data')
 }
