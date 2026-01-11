@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LoadingProgress } from '@/components/LoadingProgress'
 import { Database, AlertCircle, Settings as SettingsIcon, Upload, Globe, Info } from 'lucide-react'
+import { Version } from '@/components/Version'
 import { getApiKey } from '@/components/Settings'
 
 const PARQUET_URL = 'https://pub-d25007b87b76480b851d23d324d67505.r2.dev/NF-UNSW-NB15-v3.parquet'
@@ -75,9 +76,7 @@ function App() {
               <Database className="h-5 w-5" />
               nfchat - NetFlow Analysis
             </CardTitle>
-            <p className="text-[10px] text-muted-foreground font-mono">
-              {__COMMIT_HASH__} {__BUILD_TIME__}
-            </p>
+            <Version />
           </CardHeader>
           <CardContent className="space-y-4">
             <Tabs defaultValue="demo" className="w-full">
