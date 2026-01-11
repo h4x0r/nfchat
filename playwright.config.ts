@@ -7,6 +7,7 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   workers: process.env.CI ? 1 : undefined,
   reporter: 'html',
+  timeout: 120 * 1000, // 2 minutes for tests that load demo data
   use: {
     baseURL: 'http://localhost:5174',
     trace: 'on-first-retry',
@@ -21,7 +22,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run dev -- --port 5174',
     url: 'http://localhost:5174',
-    reuseExistingServer: false,
+    reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
   },
 })

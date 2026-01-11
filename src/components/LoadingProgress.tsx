@@ -4,6 +4,7 @@ import type { ProgressEvent, LogEntry, ProgressStage } from '@/lib/progress'
 
 const stageLabels: Record<ProgressStage, string> = {
   initializing: 'Initializing',
+  uploading: 'Uploading',
   downloading: 'Downloading',
   parsing: 'Parsing',
   building: 'Building Dashboard',
@@ -13,6 +14,7 @@ const stageLabels: Record<ProgressStage, string> = {
 
 const stageColors: Record<ProgressStage, string> = {
   initializing: 'bg-slate-500',
+  uploading: 'bg-cyan-500',
   downloading: 'bg-blue-500',
   parsing: 'bg-indigo-500',
   building: 'bg-purple-500',

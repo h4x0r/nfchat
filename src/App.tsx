@@ -1,26 +1,15 @@
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { useStore } from '@/lib/store'
 import { useNetflowData } from '@/hooks/useNetflowData'
 import { Dashboard } from '@/components/Dashboard'
 import { Chat } from '@/components/Chat'
 import { Settings } from '@/components/Settings'
-import { FileUploader, type FileType } from '@/components/FileUploader'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { LoadingProgress } from '@/components/LoadingProgress'
-import { Database, AlertCircle, Settings as SettingsIcon, Upload, Globe } from 'lucide-react'
+import { Database, AlertCircle, Settings as SettingsIcon, Upload, Globe, Info } from 'lucide-react'
 import { getApiKey } from '@/components/Settings'
-import {
-  loadParquetFromFile,
-  loadCSVFromFile,
-  loadZipFile,
-  getTimelineData,
-  getAttackDistribution,
-  getTopTalkers,
-  getFlows,
-  getFlowCount,
-} from '@/lib/duckdb'
 
 const PARQUET_URL = 'https://pub-d25007b87b76480b851d23d324d67505.r2.dev/NF-UNSW-NB15-v3.parquet'
 
@@ -28,16 +17,6 @@ function App() {
   const [showChat, setShowChat] = useState(false)
   const [showSettings, setShowSettings] = useState(false)
   const [loadStarted, setLoadStarted] = useState(false)
-  const [localFileLoading, setLocalFileLoading] = useState(false)
-  const [localFileLoaded, setLocalFileLoaded] = useState(false)
-  const [localFileError, setLocalFileError] = useState<string | null>(null)
-  // Local file progress (currently not tracked, but used for unified loading UI)
-  const localProgress = {
-    stage: 'parsing' as const,
-    percent: 50,
-    message: 'Processing local file...',
-    timestamp: Date.now(),
-  }
 
   const { loading, error, progress, logs } = useNetflowData(loadStarted ? PARQUET_URL : '')
 
@@ -46,56 +25,7 @@ function App() {
     addMessage,
     isLoading: chatLoading,
     setIsLoading: setChatLoading,
-    setTimelineData,
-    setAttackBreakdown,
-    setTopSrcIPs,
-    setTopDstIPs,
-    setFlows,
-    setTotalFlowCount,
   } = useStore()
-
-  const handleLocalFileSelect = useCallback(async (file: File, fileType: FileType) => {
-    setLocalFileLoading(true)
-    setLocalFileError(null)
-
-    try {
-      // Load the file into DuckDB based on type
-      switch (fileType) {
-        case 'parquet':
-          await loadParquetFromFile(file)
-          break
-        case 'csv':
-          await loadCSVFromFile(file)
-          break
-        case 'zip':
-          await loadZipFile(file)
-          break
-      }
-
-      // Fetch dashboard data and populate the store
-      const [timeline, attacks, srcIPs, dstIPs, flows, flowCount] = await Promise.all([
-        getTimelineData(60),
-        getAttackDistribution(),
-        getTopTalkers('src', 'flows', 10),
-        getTopTalkers('dst', 'flows', 10),
-        getFlows('1=1', 1000, 0),
-        getFlowCount(),
-      ])
-
-      setTimelineData(timeline)
-      setAttackBreakdown(attacks)
-      setTopSrcIPs(srcIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
-      setTopDstIPs(dstIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
-      setFlows(flows)
-      setTotalFlowCount(flowCount)
-
-      setLocalFileLoaded(true)
-    } catch (err) {
-      setLocalFileError(err instanceof Error ? err.message : 'Failed to load file')
-    } finally {
-      setLocalFileLoading(false)
-    }
-  }, [setTimelineData, setAttackBreakdown, setTopSrcIPs, setTopDstIPs, setFlows, setTotalFlowCount])
 
   const handleLoadData = () => {
     setLoadStarted(true)
@@ -136,7 +66,7 @@ function App() {
   }
 
   // Landing page - show load options
-  if (!loadStarted && !localFileLoaded) {
+  if (!loadStarted) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-lg">
@@ -150,29 +80,17 @@ function App() {
             </p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <Tabs defaultValue="upload" className="w-full">
+            <Tabs defaultValue="demo" className="w-full">
               <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="upload">
-                  <Upload className="h-4 w-4 mr-2" />
-                  Upload File
-                </TabsTrigger>
                 <TabsTrigger value="demo">
                   <Globe className="h-4 w-4 mr-2" />
                   Demo Data
                 </TabsTrigger>
+                <TabsTrigger value="upload">
+                  <Upload className="h-4 w-4 mr-2" />
+                  Upload File
+                </TabsTrigger>
               </TabsList>
-
-              <TabsContent value="upload" className="mt-4">
-                <FileUploader
-                  onFileSelect={handleLocalFileSelect}
-                  isLoading={localFileLoading}
-                />
-                {localFileError && (
-                  <div className="mt-4 p-3 bg-destructive/10 border border-destructive/50 rounded-lg">
-                    <p className="text-destructive text-sm">{localFileError}</p>
-                  </div>
-                )}
-              </TabsContent>
 
               <TabsContent value="demo" className="mt-4">
                 <p className="text-sm text-muted-foreground mb-4">
@@ -182,6 +100,18 @@ function App() {
                 <Button onClick={handleLoadData} className="w-full">
                   Load Demo Dataset
                 </Button>
+              </TabsContent>
+
+              <TabsContent value="upload" className="mt-4">
+                <div className="flex flex-col items-center gap-4 py-8 text-center">
+                  <Info className="h-12 w-12 text-muted-foreground" />
+                  <div>
+                    <p className="text-sm font-medium">File Upload Coming Soon</p>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Use the Demo Data tab to explore the application.
+                    </p>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
 
@@ -210,10 +140,8 @@ function App() {
     )
   }
 
-  // Loading state (for both URL and local file)
-  if (loading || localFileLoading) {
-    const currentProgress = localFileLoading ? localProgress : progress
-    const currentLogs = localFileLoading ? [] : logs
+  // Loading state
+  if (loading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -224,7 +152,7 @@ function App() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <LoadingProgress progress={currentProgress} logs={currentLogs} />
+            <LoadingProgress progress={progress} logs={logs} />
           </CardContent>
         </Card>
       </div>

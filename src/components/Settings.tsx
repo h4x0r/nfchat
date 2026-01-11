@@ -43,20 +43,19 @@ export function Settings({ onClose }: SettingsProps) {
   }
 
   const handleSave = () => {
-    if (!apiKey.trim()) {
-      setMessage({ type: 'error', text: 'API key is required' })
-      return
-    }
-
-    if (!validateApiKey(apiKey)) {
+    // Validate Anthropic API key if provided
+    if (apiKey.trim() && !validateApiKey(apiKey)) {
       setMessage({ type: 'error', text: 'Invalid API key format. Keys should start with "sk-"' })
       return
     }
 
-    localStorage.setItem(API_KEY_STORAGE_KEY, apiKey)
+    // Save settings
+    if (apiKey.trim()) {
+      localStorage.setItem(API_KEY_STORAGE_KEY, apiKey)
+    }
     localStorage.setItem(MODEL_STORAGE_KEY, model)
-    setMessage({ type: 'success', text: 'Settings saved successfully!' })
 
+    setMessage({ type: 'success', text: 'Settings saved successfully!' })
     setTimeout(() => setMessage(null), 3000)
   }
 
@@ -65,7 +64,7 @@ export function Settings({ onClose }: SettingsProps) {
     localStorage.removeItem(MODEL_STORAGE_KEY)
     setApiKey('')
     setModel(MODELS[0].value)
-    setMessage({ type: 'success', text: 'API key cleared' })
+    setMessage({ type: 'success', text: 'All settings cleared' })
     setTimeout(() => setMessage(null), 3000)
   }
 
@@ -148,7 +147,7 @@ export function Settings({ onClose }: SettingsProps) {
           </Button>
           {apiKey && (
             <Button variant="outline" onClick={handleClear} aria-label="clear">
-              Clear
+              Clear All
             </Button>
           )}
         </div>

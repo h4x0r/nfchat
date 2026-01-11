@@ -4,6 +4,7 @@
 
 export type ProgressStage =
   | 'initializing'
+  | 'uploading'
   | 'downloading'
   | 'parsing'
   | 'building'

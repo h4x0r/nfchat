@@ -9,16 +9,19 @@ vi.mock('@/hooks/useNetflowData', () => ({
   useNetflowData: vi.fn(),
 }))
 
-// Mock duckdb functions
-vi.mock('@/lib/duckdb', () => ({
-  loadParquetFromFile: vi.fn(),
-  loadCSVFromFile: vi.fn(),
-  loadZipFile: vi.fn(),
+// Mock motherduck functions
+vi.mock('@/lib/motherduck', () => ({
+  loadFileToMotherDuck: vi.fn(),
   getTimelineData: vi.fn().mockResolvedValue([]),
   getAttackDistribution: vi.fn().mockResolvedValue([]),
   getTopTalkers: vi.fn().mockResolvedValue([]),
   getFlows: vi.fn().mockResolvedValue([]),
   getFlowCount: vi.fn().mockResolvedValue(0),
+}))
+
+// Mock motherduck-auth to always return true (token is configured)
+vi.mock('@/lib/motherduck-auth', () => ({
+  hasMotherDuckToken: vi.fn().mockReturnValue(true),
 }))
 
 describe('App', () => {

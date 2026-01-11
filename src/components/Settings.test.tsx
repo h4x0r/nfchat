@@ -36,10 +36,12 @@ describe('Settings', () => {
     const user = userEvent.setup()
     render(<Settings onClose={mockOnClose} />)
 
-    const input = screen.getByLabelText(/api key/i)
+    const input = screen.getByLabelText(/anthropic api key/i)
     expect(input).toHaveAttribute('type', 'password')
 
-    await user.click(screen.getByRole('button', { name: /show/i }))
+    // Get the first "show" button (for API key, not MotherDuck token)
+    const showButtons = screen.getAllByRole('button', { name: /show/i })
+    await user.click(showButtons[0])
     expect(input).toHaveAttribute('type', 'text')
   })
 

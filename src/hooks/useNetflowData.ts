@@ -1,12 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import {
-  loadParquetData,
-  getTimelineData,
-  getAttackDistribution,
-  getTopTalkers,
-  getFlows,
-  getFlowCount,
-} from '@/lib/duckdb'
+import { loadDataFromUrl, getDashboardData } from '@/lib/api-client'
 import { useStore } from '@/lib/store'
 import type { ProgressEvent, LogEntry } from '@/lib/progress'
 
@@ -24,36 +17,6 @@ const initialProgress: ProgressEvent = {
   percent: 0,
   message: '',
   timestamp: Date.now(),
-}
-
-// Dashboard query definitions with time-proportional weights
-// Weights reflect typical query execution time relative to each other
-interface DashboardQuery {
-  name: string
-  label: string
-  weight: number // Relative time weight (higher = slower query)
-}
-
-const DASHBOARD_QUERIES: DashboardQuery[] = [
-  { name: 'timeline', label: 'Loading timeline data', weight: 50 },      // Heavy GROUP BY
-  { name: 'attacks', label: 'Loading attack distribution', weight: 5 },  // Small result set
-  { name: 'srcIPs', label: 'Loading top source IPs', weight: 15 },       // GROUP BY + sort
-  { name: 'dstIPs', label: 'Loading top destination IPs', weight: 15 },  // GROUP BY + sort
-  { name: 'flows', label: 'Loading flow records', weight: 10 },          // Simple LIMIT
-  { name: 'flowCount', label: 'Counting total flows', weight: 5 },       // Simple COUNT
-]
-
-const TOTAL_WEIGHT = DASHBOARD_QUERIES.reduce((sum, q) => sum + q.weight, 0)
-const BUILDING_START_PERCENT = 96
-const BUILDING_END_PERCENT = 100
-
-// Calculate progress percent after completing a query at given index
-function calculateProgress(completedIndex: number): number {
-  const completedWeight = DASHBOARD_QUERIES
-    .slice(0, completedIndex + 1)
-    .reduce((sum, q) => sum + q.weight, 0)
-  const progressRange = BUILDING_END_PERCENT - BUILDING_START_PERCENT
-  return Math.round(BUILDING_START_PERCENT + (completedWeight / TOTAL_WEIGHT) * progressRange)
 }
 
 export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
@@ -77,48 +40,40 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
     setLogs((prev) => [...prev, entry])
   }, [])
 
-  const fetchDashboardData = useCallback(async (
-    whereClause: string = '1=1',
-    onQueryProgress?: (query: DashboardQuery, index: number) => void
-  ) => {
+  const fetchDashboardData = useCallback(async (whereClause: string = '1=1') => {
     try {
-      // Execute queries sequentially with time-proportional progress updates
-      // Timeline (weight: 50 = 50% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[0], 0)
-      const timeline = await getTimelineData(60, whereClause)
+      setProgress({
+        stage: 'building',
+        percent: 96,
+        message: 'Loading dashboard data...',
+        timestamp: Date.now(),
+      })
+      addLog({
+        level: 'info',
+        message: 'Fetching dashboard data from server',
+        timestamp: Date.now(),
+      })
 
-      // Attack distribution (weight: 5 = 5% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[1], 1)
-      const attacks = await getAttackDistribution()
+      const data = await getDashboardData({ whereClause })
 
-      // Top source IPs (weight: 15 = 15% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[2], 2)
-      const srcIPs = await getTopTalkers('src', 'flows', 10, whereClause)
+      // Update store with all data
+      setTimelineData(data.timeline)
+      setAttackBreakdown(data.attacks)
+      setTopSrcIPs(data.topSrcIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
+      setTopDstIPs(data.topDstIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
+      setFlows(data.flows)
+      setTotalFlowCount(data.totalCount)
 
-      // Top destination IPs (weight: 15 = 15% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[3], 3)
-      const dstIPs = await getTopTalkers('dst', 'flows', 10, whereClause)
-
-      // Flow records (weight: 10 = 10% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[4], 4)
-      const flows = await getFlows(whereClause, 1000, 0)
-
-      // Flow count (weight: 5 = 5% of dashboard build time)
-      onQueryProgress?.(DASHBOARD_QUERIES[5], 5)
-      const flowCount = await getFlowCount(whereClause)
-
-      // Update store
-      setTimelineData(timeline)
-      setAttackBreakdown(attacks)
-      setTopSrcIPs(srcIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
-      setTopDstIPs(dstIPs.map((t) => ({ ip: t.ip, value: Number(t.value) })))
-      setFlows(flows)
-      setTotalFlowCount(flowCount)
+      addLog({
+        level: 'info',
+        message: `Dashboard loaded: ${data.totalCount.toLocaleString()} flows`,
+        timestamp: Date.now(),
+      })
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err)
       throw err
     }
-  }, [setTimelineData, setAttackBreakdown, setTopSrcIPs, setTopDstIPs, setFlows, setTotalFlowCount])
+  }, [setTimelineData, setAttackBreakdown, setTopSrcIPs, setTopDstIPs, setFlows, setTotalFlowCount, addLog])
 
   const refresh = useCallback(async (whereClause?: string) => {
     await fetchDashboardData(whereClause || '1=1')
@@ -133,30 +88,16 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
         setError(null)
         setLogs([])
 
-        // Load parquet with progress tracking
-        const rowCount = await loadParquetData(parquetUrl, {
+        // Load parquet via backend API with progress tracking
+        const result = await loadDataFromUrl(parquetUrl, {
           onProgress: setProgress,
           onLog: addLog,
         })
+        const rowCount = result.rowCount ?? 0
         setTotalRows(rowCount)
 
-        // Build dashboard with time-proportional progress
-        const handleQueryProgress = (query: DashboardQuery, index: number) => {
-          const percent = calculateProgress(index)
-          setProgress({
-            stage: 'building',
-            percent,
-            message: query.label + '...',
-            timestamp: Date.now(),
-          })
-          addLog({
-            level: 'info',
-            message: `${query.label} (${percent}%)`,
-            timestamp: Date.now(),
-          })
-        }
-
-        await fetchDashboardData('1=1', handleQueryProgress)
+        // Fetch all dashboard data in one API call
+        await fetchDashboardData('1=1')
 
         // Complete
         setProgress({
