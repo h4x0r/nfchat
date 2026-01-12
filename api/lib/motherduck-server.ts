@@ -1,15 +1,14 @@
 /**
  * Server-side MotherDuck Client Module
  *
- * Uses @duckdb/node-api for native Node.js MotherDuck connection.
- * This works in Vercel serverless functions (unlike WASM).
+ * Uses legacy duckdb package for better Vercel compatibility.
+ * The @duckdb/node-api package has native module issues on Vercel's runtime.
  */
 
-import { DuckDBInstance, DuckDBConnection } from '@duckdb/node-api'
+import duckdb from 'duckdb'
 
-// Singleton instance and connection
-let instance: DuckDBInstance | null = null
-let connection: DuckDBConnection | null = null
+// Singleton database and connection
+let db: duckdb.Database | null = null
 
 /**
  * Get MotherDuck token from environment.
@@ -24,29 +23,36 @@ function getToken(): string {
 
 /**
  * Initialize MotherDuck connection.
+ * Token MUST be embedded in connection string.
  */
-export async function initMotherDuck(): Promise<DuckDBConnection> {
-  if (connection) return connection
+export async function initMotherDuck(): Promise<duckdb.Database> {
+  if (db) return db
 
   const token = getToken()
 
   console.log('[MotherDuck] Creating server-side connection...')
 
-  // Create instance with MotherDuck connection
-  // Token MUST be embedded in connection string, not as separate config option
-  const connectionString = `md:?motherduck_token=${token}`
-  instance = await DuckDBInstance.create(connectionString)
+  return new Promise((resolve, reject) => {
+    // Token must be in connection string, not as config option
+    const connectionString = `md:?motherduck_token=${token}`
 
-  connection = await instance.connect()
-  console.log('[MotherDuck] Server-side connection initialized')
-
-  return connection
+    db = new duckdb.Database(connectionString, (err) => {
+      if (err) {
+        console.error('[MotherDuck] Connection failed:', err.message)
+        db = null
+        reject(err)
+      } else {
+        console.log('[MotherDuck] Server-side connection initialized')
+        resolve(db!)
+      }
+    })
+  })
 }
 
 /**
  * Get the current connection, initializing if needed.
  */
-export async function getConnection(): Promise<DuckDBConnection> {
+export async function getConnection(): Promise<duckdb.Database> {
   return initMotherDuck()
 }
 
@@ -54,8 +60,10 @@ export async function getConnection(): Promise<DuckDBConnection> {
  * Reset the connection.
  */
 export function resetConnection(): void {
-  connection = null
-  instance = null
+  if (db) {
+    db.close()
+    db = null
+  }
 }
 
 /**
@@ -64,9 +72,34 @@ export function resetConnection(): void {
 export async function executeQuery<T = Record<string, unknown>>(
   sql: string
 ): Promise<T[]> {
-  const conn = await getConnection()
-  const result = await conn.runAndReadAll(sql)
-  return result.getRowObjects() as T[]
+  const database = await getConnection()
+
+  return new Promise((resolve, reject) => {
+    database.all(sql, (err, rows) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve((rows || []) as T[])
+      }
+    })
+  })
+}
+
+/**
+ * Run a SQL statement without returning results.
+ */
+export async function runStatement(sql: string): Promise<void> {
+  const database = await getConnection()
+
+  return new Promise((resolve, reject) => {
+    database.run(sql, (err) => {
+      if (err) {
+        reject(err)
+      } else {
+        resolve()
+      }
+    })
+  })
 }
 
 /**
@@ -213,12 +246,10 @@ export async function getFlowCount(
  * Load data from a URL into MotherDuck.
  */
 export async function loadParquetData(url: string): Promise<number> {
-  const conn = await getConnection()
-
   console.log(`[MotherDuck] Loading parquet from ${url}`)
 
   // Create table directly from URL
-  await conn.run(`
+  await runStatement(`
     CREATE OR REPLACE TABLE flows AS
     SELECT * FROM read_parquet('${url}')
   `)
