@@ -1,11 +1,13 @@
 /**
  * Server-side MotherDuck Client Module
  *
- * Uses legacy duckdb package for better Vercel compatibility.
- * The @duckdb/node-api package has native module issues on Vercel's runtime.
+ * Uses duckdb-lambda-x86 for Vercel/AWS Lambda compatibility.
+ * Vercel runs on Amazon Linux 2 (GLIBC 2.26) - standard DuckDB requires GLIBC 2.29+.
+ * See: https://github.com/duckdb/duckdb/issues/7088
  */
 
-import duckdb from 'duckdb'
+// @ts-expect-error - duckdb-lambda-x86 has same API as duckdb but no types
+import duckdb from 'duckdb-lambda-x86'
 
 // Singleton database and connection
 let db: duckdb.Database | null = null
