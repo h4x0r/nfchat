@@ -4,7 +4,6 @@
  * Load parquet data from a URL into MotherDuck.
  */
 import type { VercelRequest, VercelResponse } from '@vercel/node'
-import { handleLoadFromUrl } from '../../src/api/routes/motherduck'
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Only allow POST
@@ -13,7 +12,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
+    // Dynamic import to catch module loading errors
+    console.log('[API] Importing motherduck module...')
+    const { handleLoadFromUrl } = await import('../../src/api/routes/motherduck')
+    console.log('[API] Module imported successfully')
+
     const { url, tableName } = req.body || {}
+    console.log('[API] Loading data from:', url)
 
     const result = await handleLoadFromUrl({
       url: url || '',
@@ -26,10 +31,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     return res.status(200).json(result)
   } catch (error) {
-    console.error('MotherDuck load error:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    const errorStack = error instanceof Error ? error.stack : undefined
+    console.error('MotherDuck load error:', errorMessage)
+    console.error('Stack:', errorStack)
     return res.status(500).json({
       success: false,
-      error: 'Internal server error',
+      error: errorMessage,
+      stack: process.env.NODE_ENV !== 'production' ? errorStack : undefined,
     })
   }
 }
