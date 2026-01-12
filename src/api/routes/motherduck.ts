@@ -32,9 +32,9 @@ async function getConnection(): Promise<DuckDBConnection> {
   console.log('[MotherDuck] Creating server-side connection...')
 
   // Create DuckDB instance with MotherDuck connection
-  instance = await DuckDBInstance.create('md:', {
-    motherduck_token: token,
-  })
+  // Token must be embedded in connection string, not as separate config option
+  const connectionString = `md:?motherduck_token=${token}`
+  instance = await DuckDBInstance.create(connectionString)
 
   connection = await instance.connect()
   console.log('[MotherDuck] Server-side connection initialized')
