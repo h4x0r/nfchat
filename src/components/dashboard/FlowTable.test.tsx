@@ -1,7 +1,41 @@
-import { describe, it, expect, vi } from 'vitest'
+import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { FlowTable } from './FlowTable'
 import type { FlowRecord } from '@/lib/schema'
+
+// Mock ResizeObserver for virtualization
+class ResizeObserverMock {
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+}
+global.ResizeObserver = ResizeObserverMock
+
+// Mock element dimensions for virtualization
+beforeEach(() => {
+  // Mock getBoundingClientRect for scroll container
+  Element.prototype.getBoundingClientRect = vi.fn(() => ({
+    width: 800,
+    height: 400,
+    top: 0,
+    left: 0,
+    bottom: 400,
+    right: 800,
+    x: 0,
+    y: 0,
+    toJSON: () => {},
+  }))
+
+  // Mock offsetHeight/scrollHeight for virtualizer
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', {
+    configurable: true,
+    value: 400,
+  })
+  Object.defineProperty(HTMLElement.prototype, 'scrollHeight', {
+    configurable: true,
+    value: 10000,
+  })
+})
 
 describe('FlowTable', () => {
   const mockData: Partial<FlowRecord>[] = [
@@ -90,5 +124,104 @@ describe('FlowTable', () => {
   it('displays flow count', () => {
     render(<FlowTable data={mockData} totalCount={2365425} />)
     expect(screen.getByText(/2,365,425/)).toBeInTheDocument()
+  })
+
+  // Sorting tests
+  describe('sorting', () => {
+    it('renders sortable column headers', () => {
+      render(<FlowTable data={mockData} />)
+      // Column headers should be clickable for sorting
+      const srcIpHeader = screen.getByText('Src IP')
+      expect(srcIpHeader.closest('th')).toHaveClass('cursor-pointer')
+    })
+
+    it('sorts by column when header is clicked', () => {
+      render(<FlowTable data={mockData} />)
+      const srcIpHeader = screen.getByText('Src IP')
+      fireEvent.click(srcIpHeader)
+
+      // After click, rows should be sorted by Src IP
+      // Find rows with data-index attribute (actual data rows)
+      const dataRows = document.querySelectorAll('tr[data-index]')
+      expect(dataRows[0].textContent).toContain('59.166.0.2')
+    })
+
+    it('toggles sort direction on repeated clicks', () => {
+      render(<FlowTable data={mockData} />)
+      const srcIpHeader = screen.getByText('Src IP')
+      const srcIpTh = srcIpHeader.closest('th')!
+
+      // First click - ascending
+      fireEvent.click(srcIpHeader)
+      expect(srcIpTh).toHaveAttribute('aria-sort', 'ascending')
+
+      // Second click - descending
+      fireEvent.click(srcIpHeader)
+      expect(srcIpTh).toHaveAttribute('aria-sort', 'descending')
+    })
+
+    it('shows sort indicator on sorted column', () => {
+      const { container } = render(<FlowTable data={mockData} />)
+      const srcIpHeader = screen.getByText('Src IP')
+      fireEvent.click(srcIpHeader)
+
+      // Should show sort indicator icon
+      const sortIndicator = container.querySelector('[data-sort-indicator]')
+      expect(sortIndicator).toBeInTheDocument()
+    })
+  })
+
+  // Filtering tests
+  describe('filtering', () => {
+    it('renders filter inputs in header', () => {
+      render(<FlowTable data={mockData} />)
+      // Should have filter inputs
+      const filterInputs = screen.getAllByPlaceholderText(/filter/i)
+      expect(filterInputs.length).toBeGreaterThan(0)
+    })
+
+    it('filters rows when typing in filter input', () => {
+      render(<FlowTable data={mockData} />)
+      const filterInputs = screen.getAllByPlaceholderText(/filter/i)
+      const srcIpFilter = filterInputs[0]
+
+      fireEvent.change(srcIpFilter, { target: { value: '59.166.0.2' } })
+
+      // Filtered IP should be visible, other should not
+      expect(screen.getByText('59.166.0.2')).toBeInTheDocument()
+      expect(screen.queryByText('59.166.0.4')).not.toBeInTheDocument()
+    })
+
+    it('clears filter when input is cleared', () => {
+      render(<FlowTable data={mockData} />)
+      const filterInputs = screen.getAllByPlaceholderText(/filter/i)
+      const srcIpFilter = filterInputs[0]
+
+      // Apply filter
+      fireEvent.change(srcIpFilter, { target: { value: '59.166.0.2' } })
+      // Clear filter
+      fireEvent.change(srcIpFilter, { target: { value: '' } })
+
+      // Both IPs should be visible again
+      expect(screen.getByText('59.166.0.2')).toBeInTheDocument()
+      expect(screen.getByText('59.166.0.4')).toBeInTheDocument()
+    })
+  })
+
+  // Virtualization tests
+  describe('virtualization', () => {
+    it('renders virtualized container', () => {
+      const { container } = render(<FlowTable data={mockData} />)
+      // Should have virtualized scroll container
+      const scrollContainer = container.querySelector('[data-virtualized]')
+      expect(scrollContainer).toBeInTheDocument()
+    })
+
+    it('uses data-index for row identification', () => {
+      render(<FlowTable data={mockData} />)
+      // Data rows should have data-index attribute for virtualization tracking
+      const dataRows = document.querySelectorAll('tr[data-index]')
+      expect(dataRows.length).toBeGreaterThan(0)
+    })
   })
 })

@@ -3,8 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { Dashboard } from './Dashboard'
 
 // Mock child components to isolate Dashboard layout testing
-vi.mock('./dashboard/Timeline', () => ({
-  Timeline: () => <div data-testid="timeline-mock">Timeline</div>,
+vi.mock('./dashboard/timeline', () => ({
+  ProTimeline: () => <div data-testid="timeline-mock">ProTimeline</div>,
 }))
 
 vi.mock('./dashboard/AttackBreakdown', () => ({

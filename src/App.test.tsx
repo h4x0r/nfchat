@@ -24,6 +24,11 @@ vi.mock('@/lib/motherduck-auth', () => ({
   hasMotherDuckToken: vi.fn().mockReturnValue(true),
 }))
 
+// Mock dashboard components that have complex dependencies
+vi.mock('@/components/dashboard/timeline', () => ({
+  ProTimeline: () => <div data-testid="timeline-mock">ProTimeline</div>,
+}))
+
 describe('App', () => {
   beforeEach(() => {
     vi.clearAllMocks()

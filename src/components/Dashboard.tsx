@@ -1,10 +1,11 @@
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Timeline } from './dashboard/Timeline'
+import { ProTimeline } from './dashboard/timeline'
 import { AttackBreakdown } from './dashboard/AttackBreakdown'
 import { TopTalkers } from './dashboard/TopTalkers'
 import { FlowTable } from './dashboard/FlowTable'
 import { useStore } from '@/lib/store'
+import type { TimelineDataPoint } from './dashboard/timeline'
 
 interface DashboardProps {
   loading?: boolean
@@ -64,11 +65,11 @@ export function Dashboard({ loading = false, onChatToggle }: DashboardProps) {
           {/* Left column - Timeline and Charts */}
           <div className="col-span-8 flex flex-col gap-4">
             {/* Timeline */}
-            <div className="h-48 border rounded-lg p-4">
-              <h2 className="text-sm font-medium mb-2">Traffic Timeline</h2>
-              <div className="h-[calc(100%-2rem)]">
-                <Timeline data={timelineData} />
-              </div>
+            <div className="h-56">
+              <ProTimeline
+                data={timelineData as TimelineDataPoint[]}
+                loading={loading}
+              />
             </div>
 
             {/* Flow Table */}

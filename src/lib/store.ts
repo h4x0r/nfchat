@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import type { AttackType, FlowRecord } from './schema';
-import type { TimelineData } from '@/components/dashboard/Timeline';
+import type { TimelineData } from '@/components/dashboard/TimelineChart';
+import type { PlaybackSpeed } from '@/components/dashboard/timeline/constants';
 
 export interface AttackBreakdownData {
   attack: string;
@@ -10,6 +11,15 @@ export interface AttackBreakdownData {
 export interface TopTalkerData {
   ip: string;
   value: number;
+}
+
+export interface PlaybackState {
+  isPlaying: boolean;
+  currentTime: number; // ms timestamp in data range
+  speed: PlaybackSpeed;
+  duration: number; // total duration in ms (computed from data)
+  inPoint: number | null; // A-B selection start
+  outPoint: number | null; // A-B selection end
 }
 
 export interface FilterState {
@@ -51,6 +61,16 @@ export interface ChatMessage {
 }
 
 export interface AppState extends FilterState {
+  // Playback state
+  playback: PlaybackState;
+  setIsPlaying: (playing: boolean) => void;
+  setCurrentTime: (time: number) => void;
+  setPlaybackSpeed: (speed: PlaybackSpeed) => void;
+  setPlaybackDuration: (duration: number) => void;
+  setInPoint: (time: number | null) => void;
+  setOutPoint: (time: number | null) => void;
+  resetPlayback: () => void;
+
   // Filter actions
   setTimeRange: (start: number | null, end: number | null) => void;
   addSrcIp: (ip: string) => void;
@@ -110,8 +130,53 @@ const initialFilterState: FilterState = {
   resultCount: null,
 };
 
+const initialPlaybackState: PlaybackState = {
+  isPlaying: false,
+  currentTime: 0,
+  speed: 1,
+  duration: 0,
+  inPoint: null,
+  outPoint: null,
+};
+
 export const useStore = create<AppState>((set) => ({
   ...initialFilterState,
+
+  // Playback state
+  playback: initialPlaybackState,
+
+  setIsPlaying: (playing) =>
+    set((state) => ({
+      playback: { ...state.playback, isPlaying: playing },
+    })),
+
+  setCurrentTime: (time) =>
+    set((state) => ({
+      playback: { ...state.playback, currentTime: time },
+    })),
+
+  setPlaybackSpeed: (speed) =>
+    set((state) => ({
+      playback: { ...state.playback, speed },
+    })),
+
+  setPlaybackDuration: (duration) =>
+    set((state) => ({
+      playback: { ...state.playback, duration },
+    })),
+
+  setInPoint: (time) =>
+    set((state) => ({
+      playback: { ...state.playback, inPoint: time },
+    })),
+
+  setOutPoint: (time) =>
+    set((state) => ({
+      playback: { ...state.playback, outPoint: time },
+    })),
+
+  resetPlayback: () =>
+    set({ playback: initialPlaybackState }),
 
   // Filter actions
   setTimeRange: (start, end) =>
