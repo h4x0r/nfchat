@@ -3,6 +3,10 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "functions": {
+    "api/motherduck/*.ts": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/duckdb-lambda-x86/**/*"
+    },
     "api/**/*.ts": {
       "maxDuration": 60
     }
