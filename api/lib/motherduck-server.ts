@@ -6,6 +6,12 @@
  * See: https://github.com/duckdb/duckdb/issues/7088
  */
 
+// Set HOME before importing DuckDB - required for serverless environments
+// See: https://github.com/duckdb/duckdb/issues/3855
+if (!process.env.HOME) {
+  process.env.HOME = '/tmp'
+}
+
 // @ts-expect-error - duckdb-lambda-x86 has same API as duckdb but no types
 import duckdb from 'duckdb-lambda-x86'
 
@@ -39,8 +45,8 @@ export async function initMotherDuck(): Promise<duckdb.Database> {
     // Set home_directory=/tmp for serverless environments (Lambda/Vercel have no home dir)
     const connectionString = `md:?motherduck_token=${token}`
 
-    // Connect to MotherDuck with home_directory config for serverless
-    db = new duckdb.Database(connectionString, { home_directory: '/tmp' }, (err: Error | null) => {
+    // Connect to MotherDuck (HOME env var set at module load for serverless)
+    db = new duckdb.Database(connectionString, (err: Error | null) => {
       if (err) {
         console.error('[MotherDuck] Connection failed:', err.message)
         db = null
