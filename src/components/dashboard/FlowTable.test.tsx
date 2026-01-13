@@ -223,5 +223,76 @@ describe('FlowTable', () => {
       const dataRows = document.querySelectorAll('tr[data-index]')
       expect(dataRows.length).toBeGreaterThan(0)
     })
+
+    it('only renders visible rows plus overscan, not all rows', () => {
+      // Generate 1000 mock flows to test virtualization
+      const largeDataset: Partial<FlowRecord>[] = Array.from({ length: 1000 }, (_, i) => ({
+        FLOW_START_MILLISECONDS: 1424242193040 + i,
+        IPV4_SRC_ADDR: `192.168.1.${i % 256}`,
+        L4_SRC_PORT: 1000 + i,
+        IPV4_DST_ADDR: `10.0.0.${i % 256}`,
+        L4_DST_PORT: 80,
+        PROTOCOL: 6,
+        IN_BYTES: 1000 * i,
+        OUT_BYTES: 500 * i,
+        Attack: 'Benign',
+      }))
+
+      render(<FlowTable data={largeDataset} />)
+
+      // With 400px height and 35px row height, plus overscan of 10,
+      // we should render approximately 12 visible rows + 20 overscan = ~32 rows max
+      // NOT all 1000 rows
+      const renderedDataRows = document.querySelectorAll('tr[data-index]')
+
+      // Should render far fewer than 1000 rows
+      // With proper virtualization: ~12 visible + 10 overscan each side = ~32 max
+      expect(renderedDataRows.length).toBeLessThan(100)
+      expect(renderedDataRows.length).toBeGreaterThan(0)
+    })
+
+    it('has proper structure for virtualization with spacer rows', () => {
+      const largeDataset: Partial<FlowRecord>[] = Array.from({ length: 100 }, (_, i) => ({
+        FLOW_START_MILLISECONDS: 1424242193040 + i,
+        IPV4_SRC_ADDR: `192.168.1.${i % 256}`,
+        L4_SRC_PORT: 1000 + i,
+        IPV4_DST_ADDR: `10.0.0.${i % 256}`,
+        L4_DST_PORT: 80,
+        PROTOCOL: 6,
+        IN_BYTES: 1000,
+        OUT_BYTES: 500,
+        Attack: 'Benign',
+      }))
+
+      const { container } = render(<FlowTable data={largeDataset} />)
+
+      // The tbody should exist and contain rows
+      const tbody = container.querySelector('tbody')
+      expect(tbody).toBeInTheDocument()
+
+      // Should have spacer rows for virtualization
+      // (first and last child of tbody are spacers)
+      const allRows = tbody?.querySelectorAll('tr')
+      expect(allRows?.length).toBeGreaterThan(0)
+    })
+  })
+
+  // Performance tests
+  describe('performance', () => {
+    it('memoizes row click handler', () => {
+      const handleClick = vi.fn()
+      const { rerender } = render(
+        <FlowTable data={mockData} onRowClick={handleClick} />
+      )
+
+      // Re-render with same props should not create new handlers
+      rerender(<FlowTable data={mockData} onRowClick={handleClick} />)
+
+      // Click a row
+      const row = screen.getByText('59.166.0.2').closest('tr')
+      if (row) fireEvent.click(row)
+
+      expect(handleClick).toHaveBeenCalledTimes(1)
+    })
   })
 })

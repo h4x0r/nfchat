@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { MessageSquare, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ProTimeline } from './dashboard/timeline'
@@ -23,6 +24,15 @@ export function Dashboard({ loading = false, onChatToggle }: DashboardProps) {
     selectedFlow,
     setSelectedFlow,
   } = useStore()
+
+  // Memoize selectedIndex computation to avoid O(n) search on every render
+  const selectedIndex = useMemo(() => {
+    if (!selectedFlow) return undefined
+    return flows.findIndex(
+      (f) =>
+        f.FLOW_START_MILLISECONDS === selectedFlow.FLOW_START_MILLISECONDS
+    )
+  }, [flows, selectedFlow])
 
   if (loading) {
     return (
@@ -80,15 +90,7 @@ export function Dashboard({ loading = false, onChatToggle }: DashboardProps) {
                   data={flows}
                   totalCount={totalFlowCount}
                   onRowClick={setSelectedFlow}
-                  selectedIndex={
-                    selectedFlow
-                      ? flows.findIndex(
-                          (f) =>
-                            f.FLOW_START_MILLISECONDS ===
-                            selectedFlow.FLOW_START_MILLISECONDS
-                        )
-                      : undefined
-                  }
+                  selectedIndex={selectedIndex}
                 />
               </div>
             </div>

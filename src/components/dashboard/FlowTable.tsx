@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useCallback, memo } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   useReactTable,
@@ -30,6 +30,38 @@ interface FlowTableProps {
   selectedIndex?: number
   totalCount?: number
 }
+
+// Memoized row component to prevent unnecessary re-renders
+const VirtualRow = memo(function VirtualRow({
+  row,
+  virtualRow,
+  measureElement,
+  isSelected,
+  onClick,
+}: {
+  row: ReturnType<ReturnType<typeof useReactTable<Partial<FlowRecord>>>['getRowModel']>['rows'][0]
+  virtualRow: { index: number; start: number; size: number }
+  measureElement: (el: HTMLTableRowElement | null) => void
+  isSelected: boolean
+  onClick: () => void
+}) {
+  return (
+    <TableRow
+      data-index={virtualRow.index}
+      ref={measureElement}
+      className={`cursor-pointer hover:bg-muted/50 ${
+        isSelected ? 'selected bg-primary/10' : ''
+      }`}
+      onClick={onClick}
+    >
+      {row.getVisibleCells().map((cell) => (
+        <TableCell key={cell.id} className="py-1">
+          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+        </TableCell>
+      ))}
+    </TableRow>
+  )
+})
 
 export function FlowTable({
   data,
@@ -139,12 +171,20 @@ export function FlowTable({
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => 32, // Estimated row height in pixels
+    estimateSize: () => 35, // Estimated row height in pixels
     overscan: 10,
   })
 
   const virtualRows = virtualizer.getVirtualItems()
   const totalSize = virtualizer.getTotalSize()
+
+  // Memoize the row click handler creator to avoid creating new functions
+  const handleRowClick = useCallback(
+    (flow: Partial<FlowRecord>) => {
+      onRowClick?.(flow)
+    },
+    [onRowClick]
+  )
 
   // Early returns after all hooks
   if (loading) {
@@ -245,21 +285,14 @@ export function FlowTable({
             {virtualRows.map((virtualRow) => {
               const row = rows[virtualRow.index]
               return (
-                <TableRow
+                <VirtualRow
                   key={row.id}
-                  data-index={virtualRow.index}
-                  ref={(el) => virtualizer.measureElement(el)}
-                  className={`cursor-pointer hover:bg-muted/50 ${
-                    selectedIndex === virtualRow.index ? 'selected bg-primary/10' : ''
-                  }`}
-                  onClick={() => onRowClick?.(row.original)}
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="py-1">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
+                  row={row}
+                  virtualRow={virtualRow}
+                  measureElement={(el) => virtualizer.measureElement(el)}
+                  isSelected={selectedIndex === virtualRow.index}
+                  onClick={() => handleRowClick(row.original)}
+                />
               )
             })}
             {/* Bottom spacer */}
