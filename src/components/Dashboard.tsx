@@ -95,26 +95,30 @@ export function Dashboard({ loading = false, onChatToggle }: DashboardProps) {
           </div>
 
           {/* Right column - Stats */}
-          <div className="col-span-4 flex flex-col gap-4">
+          <div className="col-span-4 flex flex-col gap-4 overflow-hidden">
             {/* Attack Breakdown */}
-            <div className="h-64 border rounded-lg p-4">
+            <div className="h-64 border rounded-lg p-4 overflow-hidden">
               <h2 className="text-sm font-medium mb-2">Attack Types</h2>
-              <div className="h-[calc(100%-2rem)]">
+              <div className="h-[calc(100%-2rem)] overflow-hidden">
                 <AttackBreakdown data={attackBreakdown} />
               </div>
             </div>
 
             {/* Top Talkers */}
-            <div className="flex-1 border rounded-lg p-4 min-h-0">
+            <div className="flex-1 border rounded-lg p-4 min-h-0 overflow-hidden">
               <h2 className="text-sm font-medium mb-2">Top Talkers</h2>
-              <div className="h-[calc(100%-2rem)] grid grid-rows-2 gap-2">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Source IPs</p>
-                  <TopTalkers data={topSrcIPs} />
+              <div className="h-[calc(100%-2rem)] grid grid-rows-2 gap-2 overflow-hidden">
+                <div className="overflow-hidden flex flex-col">
+                  <p className="text-xs text-muted-foreground mb-1 flex-shrink-0">Source IPs</p>
+                  <div className="flex-1 min-h-0">
+                    <TopTalkers data={topSrcIPs} />
+                  </div>
                 </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Destination IPs</p>
-                  <TopTalkers data={topDstIPs} />
+                <div className="overflow-hidden flex flex-col">
+                  <p className="text-xs text-muted-foreground mb-1 flex-shrink-0">Destination IPs</p>
+                  <div className="flex-1 min-h-0">
+                    <TopTalkers data={topDstIPs} />
+                  </div>
                 </div>
               </div>
             </div>

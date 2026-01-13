@@ -199,10 +199,10 @@ export function ProTimeline({
         />
 
         <TimecodeDisplay
-          currentTime={playback.currentTime}
+          currentTime={playback.currentTime - timeRange.start}
           duration={playback.duration}
-          inPoint={playback.inPoint}
-          outPoint={playback.outPoint}
+          inPoint={playback.inPoint ? playback.inPoint - timeRange.start : null}
+          outPoint={playback.outPoint ? playback.outPoint - timeRange.start : null}
         />
       </div>
 

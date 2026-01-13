@@ -71,7 +71,7 @@ export function TopTalkers({
   const metricLabel = metric === 'bytes' ? 'Bytes' : 'Flows'
 
   return (
-    <div data-testid="top-talkers" className="space-y-2 p-2">
+    <div data-testid="top-talkers" className="space-y-2 p-2 h-full overflow-y-auto">
       <div className="text-xs text-muted-foreground mb-2">
         Top {directionLabel} IPs by {metricLabel}
       </div>

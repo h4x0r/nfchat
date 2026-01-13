@@ -50,7 +50,7 @@ export function AttackBreakdown({
   const maxCount = Math.max(...displayData.map((d) => d.count))
 
   return (
-    <div data-testid="attack-breakdown" className="space-y-2 p-2">
+    <div data-testid="attack-breakdown" className="space-y-2 p-2 h-full overflow-y-auto">
       {displayData.map((item) => {
         const percentage = ((item.count / total) * 100).toFixed(1)
         const barWidth = (item.count / maxCount) * 100
