@@ -35,4 +35,10 @@ npm run test:watch # Watch mode
 
 ## Git Workflow
 
-After every commit, always push to trigger Vercel deployment.
+After every commit, always push to trigger Vercel deployment, then check deployment status:
+
+```bash
+git push && vercel --prod
+```
+
+Or check status manually: `vercel ls` or visit the Vercel dashboard for build errors.
