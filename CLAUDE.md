@@ -32,3 +32,7 @@
 npm test           # Run all tests
 npm run test:watch # Watch mode
 ```
+
+## Git Workflow
+
+After every commit, always push to trigger Vercel deployment.
