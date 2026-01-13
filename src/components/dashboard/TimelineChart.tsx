@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from 'react'
+import { useMemo } from 'react'
 import {
   AreaChart,
   Area,
@@ -11,6 +11,7 @@ import {
 } from 'recharts'
 import { Loader2 } from 'lucide-react'
 import { ATTACK_COLORS, ATTACK_TYPES, type AttackType } from '@/lib/schema'
+import { useContainerDimensions } from '@/hooks/useContainerDimensions'
 
 export interface TimelineData {
   time: number
@@ -55,24 +56,8 @@ export function TimelineChart({
   showLegend = false,
   onBrushChange,
 }: TimelineProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const [containerReady, setContainerReady] = useState(false)
-
-  // Wait for container to have dimensions before rendering chart
-  useEffect(() => {
-    const checkDimensions = () => {
-      if (containerRef.current) {
-        const { offsetWidth, offsetHeight } = containerRef.current
-        if (offsetWidth > 0 && offsetHeight > 0) {
-          setContainerReady(true)
-        }
-      }
-    }
-
-    // Small delay to ensure layout is complete after mount
-    const timer = setTimeout(checkDimensions, 0)
-    return () => clearTimeout(timer)
-  }, [])
+  // Use ResizeObserver-based hook for reliable dimension tracking
+  const { ref: containerRef, isReady: containerReady } = useContainerDimensions()
 
   const stackedData = useMemo(() => transformToStacked(data), [data])
 

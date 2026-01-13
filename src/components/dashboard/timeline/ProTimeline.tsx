@@ -1,12 +1,13 @@
-import { useEffect, useRef, useMemo, useCallback, useState, useLayoutEffect } from 'react'
+import { useEffect, useRef, useMemo, useCallback } from 'react'
 import { useStore } from '@/lib/store'
+import { useContainerDimensions } from '@/hooks/useContainerDimensions'
 import { PREMIERE_COLORS, TIMELINE_CONFIG } from './constants'
 import { pixelToTime, timeToPercent } from './utils'
 import { TimecodeDisplay } from './TimecodeDisplay'
 import { TimeRuler } from './TimeRuler'
 import { Playhead } from './Playhead'
 import { PlaybackControls } from './PlaybackControls'
-import type { ProTimelineProps, TimelineDataPoint } from './types'
+import type { ProTimelineProps } from './types'
 
 // Recharts for data visualization
 import {
@@ -17,6 +18,12 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts'
+
+interface TimelineDataPoint {
+  time: number
+  attack: string
+  count: number
+}
 
 /**
  * Aggregate data points for visualization (group by time bucket)
@@ -40,39 +47,20 @@ export function ProTimeline({
   markers = [],
   loading = false,
   onTimeChange,
-  onRegionChange: _onRegionChange, // TODO: implement region selection
   onMarkerClick,
 }: ProTimelineProps) {
   const trackRef = useRef<HTMLDivElement>(null)
   const animationRef = useRef<number | undefined>(undefined)
   const lastTickRef = useRef<number>(0)
-  const [containerReady, setContainerReady] = useState(false)
 
-  // Wait for container to have dimensions before rendering chart
-  useLayoutEffect(() => {
-    if (trackRef.current) {
-      const { offsetWidth, offsetHeight } = trackRef.current
-      if (offsetWidth > 0 && offsetHeight > 0) {
-        setContainerReady(true)
-      }
-    }
-  }, [])
+  // Use ResizeObserver-based hook for reliable dimension tracking
+  const { setRef: setContainerRef, isReady: containerReady, width: trackWidth } = useContainerDimensions()
 
-  // Also check on resize
-  useEffect(() => {
-    const checkDimensions = () => {
-      if (trackRef.current) {
-        const { offsetWidth, offsetHeight } = trackRef.current
-        if (offsetWidth > 0 && offsetHeight > 0) {
-          setContainerReady(true)
-        }
-      }
-    }
-
-    // Small delay to ensure layout is complete after mount
-    const timer = setTimeout(checkDimensions, 0)
-    return () => clearTimeout(timer)
-  }, [])
+  // Combined ref callback that sets both refs
+  const setTrackRef = useCallback((el: HTMLDivElement | null) => {
+    trackRef.current = el
+    setContainerRef(el)
+  }, [setContainerRef])
 
   // Zustand store
   const playback = useStore((s) => s.playback)
@@ -193,7 +181,8 @@ export function ProTimeline({
     timeRange.end
   )
 
-  const trackWidth = trackRef.current?.offsetWidth ?? 800
+  // Use width from hook, with fallback for initial render
+  const rulerWidth = trackWidth > 0 ? trackWidth : 800
 
   if (loading) {
     return (
@@ -237,12 +226,12 @@ export function ProTimeline({
       <TimeRuler
         startTime={timeRange.start}
         endTime={timeRange.end}
-        width={trackWidth}
+        width={rulerWidth}
       />
 
       {/* Track area with visualization */}
       <div
-        ref={trackRef}
+        ref={setTrackRef}
         data-timeline-track
         className="relative cursor-crosshair"
         style={{

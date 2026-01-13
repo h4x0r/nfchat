@@ -38,6 +38,8 @@ export function FlowTable({
   selectedIndex,
   totalCount,
 }: FlowTableProps) {
+  // All hooks must be called unconditionally at the top
+  const parentRef = useRef<HTMLDivElement>(null)
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
 
@@ -132,6 +134,19 @@ export function FlowTable({
     onColumnFiltersChange: setColumnFilters,
   })
 
+  const { rows } = table.getRowModel()
+
+  const virtualizer = useVirtualizer({
+    count: rows.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => 32, // Estimated row height in pixels
+    overscan: 10,
+  })
+
+  const virtualRows = virtualizer.getVirtualItems()
+  const totalSize = virtualizer.getTotalSize()
+
+  // Early returns after all hooks
   if (loading) {
     return (
       <div
@@ -153,19 +168,6 @@ export function FlowTable({
       </div>
     )
   }
-
-  const parentRef = useRef<HTMLDivElement>(null)
-  const { rows } = table.getRowModel()
-
-  const virtualizer = useVirtualizer({
-    count: rows.length,
-    getScrollElement: () => parentRef.current,
-    estimateSize: () => 32, // Estimated row height in pixels
-    overscan: 10,
-  })
-
-  const virtualRows = virtualizer.getVirtualItems()
-  const totalSize = virtualizer.getTotalSize()
 
   return (
     <div data-testid="flow-table" className="h-full flex flex-col">
