@@ -35,6 +35,19 @@ interface QueryResponse {
   error?: string
 }
 
+interface ChatQueryResponse {
+  success: boolean
+  queries?: string[]
+  reasoning?: string
+  error?: string
+}
+
+interface ChatAnalyzeResponse {
+  success: boolean
+  response?: string
+  error?: string
+}
+
 // ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
@@ -147,4 +160,74 @@ export async function executeQuery<T = Record<string, unknown>>(
   }
 
   return response.data as T[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// Chat API Functions
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Ask the AI what queries are needed to answer a question.
+ * Returns SQL queries to execute.
+ */
+export async function askQuestion(
+  question: string,
+  turnstileToken = 'dev-token'
+): Promise<{ queries: string[]; reasoning?: string }> {
+  const response = await apiPost<ChatQueryResponse>('/api/chat/query', {
+    question,
+    turnstileToken,
+  })
+
+  return {
+    queries: response.queries ?? [],
+    reasoning: response.reasoning,
+  }
+}
+
+/**
+ * Ask the AI to analyze query results and answer the question.
+ */
+export async function analyzeData(
+  question: string,
+  data: unknown[],
+  turnstileToken = 'dev-token'
+): Promise<string> {
+  const response = await apiPost<ChatAnalyzeResponse>('/api/chat/analyze', {
+    question,
+    data,
+    turnstileToken,
+  })
+
+  return response.response ?? 'No response from AI'
+}
+
+/**
+ * Full chat flow: ask question → execute queries → analyze results.
+ * Returns the AI's analysis response.
+ */
+export async function chat(
+  question: string,
+  turnstileToken = 'dev-token'
+): Promise<{ response: string; queries: string[]; data: unknown[] }> {
+  // Step 1: Get queries from AI
+  const { queries } = await askQuestion(question, turnstileToken)
+
+  // If no queries needed (greeting/simple question), return early
+  if (queries.length === 0) {
+    const response = await analyzeData(question, [], turnstileToken)
+    return { response, queries: [], data: [] }
+  }
+
+  // Step 2: Execute queries
+  const allData: unknown[] = []
+  for (const sql of queries) {
+    const results = await executeQuery(sql)
+    allData.push(...results)
+  }
+
+  // Step 3: Analyze results
+  const response = await analyzeData(question, allData, turnstileToken)
+
+  return { response, queries, data: allData }
 }

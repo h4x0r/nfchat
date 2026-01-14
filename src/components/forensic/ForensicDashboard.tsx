@@ -1,5 +1,6 @@
 import { useCallback } from 'react'
 import { useStore } from '@/lib/store'
+import { chat } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
 import { Chat } from '../Chat'
 import { StatsBar } from './StatsBar'
@@ -28,31 +29,51 @@ export function ForensicDashboard() {
   const messages = useStore((s) => s.messages)
   const isLoading = useStore((s) => s.isLoading)
   const addMessage = useStore((s) => s.addMessage)
+  const setIsLoading = useStore((s) => s.setIsLoading)
+
+  // Process a chat message through the AI
+  const processChat = useCallback(
+    async (message: string) => {
+      // Add user message
+      addMessage({ role: 'user', content: message })
+
+      // Call AI
+      setIsLoading(true)
+      try {
+        const result = await chat(message)
+        addMessage({
+          role: 'assistant',
+          content: result.response,
+          sql: result.queries.length > 0 ? result.queries.join('\n') : undefined,
+        })
+      } catch (error) {
+        addMessage({
+          role: 'assistant',
+          content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        })
+      } finally {
+        setIsLoading(false)
+      }
+    },
+    [addMessage, setIsLoading]
+  )
 
   // Handle cell click - send filter query to chat
   const handleCellClick = useCallback(
     (column: string, value: string) => {
       const label = COLUMN_LABELS[column] || column
       const query = `Filter by ${label} = ${value}`
-
-      // Add as user message
-      addMessage({
-        role: 'user',
-        content: query,
-      })
+      processChat(query)
     },
-    [addMessage]
+    [processChat]
   )
 
   // Handle chat send
   const handleChatSend = useCallback(
     (message: string) => {
-      addMessage({
-        role: 'user',
-        content: message,
-      })
+      processChat(message)
     },
-    [addMessage]
+    [processChat]
   )
 
   return (
