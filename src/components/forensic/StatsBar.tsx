@@ -1,4 +1,5 @@
 import { useStore } from '@/lib/store'
+import { Button } from '@/components/ui/button'
 import { AttackPopover } from './popovers/AttackPopover'
 import { TopTalkersPopover } from './popovers/TopTalkersPopover'
 
@@ -15,6 +16,8 @@ export function StatsBar({ onFilter }: StatsBarProps) {
   const attackBreakdown = useStore((s) => s.attackBreakdown)
   const topSrcIPs = useStore((s) => s.topSrcIPs)
   const topDstIPs = useStore((s) => s.topDstIPs)
+  const hideBenign = useStore((s) => s.hideBenign)
+  const toggleHideBenign = useStore((s) => s.toggleHideBenign)
 
   // Format large numbers
   const formatCount = (n: number) => {
@@ -41,6 +44,15 @@ export function StatsBar({ onFilter }: StatsBarProps) {
         topDstIPs={topDstIPs}
         onFilter={onFilter}
       />
+
+      <Button
+        variant={hideBenign ? 'default' : 'outline'}
+        size="sm"
+        onClick={toggleHideBenign}
+        className="ml-auto"
+      >
+        {hideBenign ? 'Showing Attacks' : 'Hide Benign'}
+      </Button>
     </div>
   )
 }

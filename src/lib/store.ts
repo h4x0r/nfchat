@@ -92,6 +92,11 @@ export interface AppState extends FilterState {
   setFlows: (flows: Partial<FlowRecord>[]) => void;
   setTotalFlowCount: (count: number) => void;
   setSelectedFlow: (flow: Partial<FlowRecord> | null) => void;
+
+  // Quick filter: hide benign flows
+  hideBenign: boolean;
+  toggleHideBenign: () => void;
+  filteredFlows: Partial<FlowRecord>[];
 }
 
 const initialFilterState: FilterState = {
@@ -194,7 +199,18 @@ export const useStore = create<AppState>((set) => ({
   setFlows: (flows) => set({ flows }),
   setTotalFlowCount: (count) => set({ totalFlowCount: count }),
   setSelectedFlow: (flow) => set({ selectedFlow: flow }),
+
+  // Quick filter: hide benign flows
+  hideBenign: false,
+  toggleHideBenign: () => set((state) => ({ hideBenign: !state.hideBenign })),
+  filteredFlows: [],
 }));
+
+// Selector for filtered flows (computed from hideBenign state)
+export const selectFilteredFlows = (state: AppState): Partial<FlowRecord>[] => {
+  if (!state.hideBenign) return state.flows;
+  return state.flows.filter((f) => f.Attack !== 'Benign');
+};
 
 // Selector for building SQL WHERE clause from filters
 export function buildWhereClause(state: FilterState): string {

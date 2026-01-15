@@ -1,5 +1,5 @@
 import { useCallback } from 'react'
-import { useStore } from '@/lib/store'
+import { useStore, selectFilteredFlows } from '@/lib/store'
 import { chat } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
 import { Chat } from '../Chat'
@@ -24,7 +24,7 @@ const COLUMN_LABELS: Record<string, string> = {
  */
 export function ForensicDashboard() {
   // Store state
-  const flows = useStore((s) => s.flows)
+  const flows = useStore(selectFilteredFlows)
   const totalFlowCount = useStore((s) => s.totalFlowCount)
   const messages = useStore((s) => s.messages)
   const isLoading = useStore((s) => s.isLoading)

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest'
-import { useStore, buildWhereClause, type FilterState } from './store'
+import { useStore, buildWhereClause, selectFilteredFlows, type FilterState } from './store'
 
 describe('buildWhereClause', () => {
   const emptyFilters: FilterState = {
@@ -212,5 +212,48 @@ describe('useStore', () => {
     expect(messages[0].content).toBe('Show me attacks')
     expect(messages[0].id).toBeDefined()
     expect(messages[0].timestamp).toBeInstanceOf(Date)
+  })
+
+  describe('hideBenign filter', () => {
+    it('defaults to false', () => {
+      expect(useStore.getState().hideBenign).toBe(false)
+    })
+
+    it('toggles hideBenign state', () => {
+      const { toggleHideBenign } = useStore.getState()
+
+      toggleHideBenign()
+      expect(useStore.getState().hideBenign).toBe(true)
+
+      toggleHideBenign()
+      expect(useStore.getState().hideBenign).toBe(false)
+    })
+
+    it('filters flows when hideBenign is true', () => {
+      const mockFlows = [
+        { Attack: 'Benign', IPV4_SRC_ADDR: '1.1.1.1' },
+        { Attack: 'Backdoor', IPV4_SRC_ADDR: '2.2.2.2' },
+        { Attack: 'Benign', IPV4_SRC_ADDR: '3.3.3.3' },
+        { Attack: 'Exploits', IPV4_SRC_ADDR: '4.4.4.4' },
+      ]
+
+      useStore.setState({ flows: mockFlows, hideBenign: false })
+      expect(selectFilteredFlows(useStore.getState())).toHaveLength(4)
+
+      useStore.setState({ hideBenign: true })
+      const filtered = selectFilteredFlows(useStore.getState())
+      expect(filtered).toHaveLength(2)
+      expect(filtered.every((f) => f.Attack !== 'Benign')).toBe(true)
+    })
+
+    it('returns all flows when hideBenign is false', () => {
+      const mockFlows = [
+        { Attack: 'Benign', IPV4_SRC_ADDR: '1.1.1.1' },
+        { Attack: 'Backdoor', IPV4_SRC_ADDR: '2.2.2.2' },
+      ]
+
+      useStore.setState({ flows: mockFlows, hideBenign: false })
+      expect(selectFilteredFlows(useStore.getState())).toHaveLength(2)
+    })
   })
 })

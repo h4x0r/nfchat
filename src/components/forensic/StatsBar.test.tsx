@@ -100,4 +100,43 @@ describe('StatsBar', () => {
     render(<StatsBar onFilter={vi.fn()} />)
     expect(screen.getByText(/No attacks/i)).toBeInTheDocument()
   })
+
+  describe('Hide Benign toggle', () => {
+    beforeEach(() => {
+      useStore.setState({ hideBenign: false })
+    })
+
+    it('renders Hide Benign button', () => {
+      render(<StatsBar onFilter={vi.fn()} />)
+      expect(screen.getByRole('button', { name: /hide benign/i })).toBeInTheDocument()
+    })
+
+    it('toggles hideBenign state when clicked', async () => {
+      const user = userEvent.setup()
+      render(<StatsBar onFilter={vi.fn()} />)
+
+      const button = screen.getByRole('button', { name: /hide benign/i })
+      await user.click(button)
+
+      expect(useStore.getState().hideBenign).toBe(true)
+    })
+
+    it('shows "Showing Attacks" when hideBenign is true', () => {
+      useStore.setState({ hideBenign: true })
+      render(<StatsBar onFilter={vi.fn()} />)
+
+      expect(screen.getByRole('button', { name: /showing attacks/i })).toBeInTheDocument()
+    })
+
+    it('toggles back to "Hide Benign" when clicked again', async () => {
+      const user = userEvent.setup()
+      useStore.setState({ hideBenign: true })
+      render(<StatsBar onFilter={vi.fn()} />)
+
+      const button = screen.getByRole('button', { name: /showing attacks/i })
+      await user.click(button)
+
+      expect(useStore.getState().hideBenign).toBe(false)
+    })
+  })
 })
