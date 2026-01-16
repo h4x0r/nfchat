@@ -13,10 +13,8 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 // Mock the ai module to simulate network errors (triggers fallback)
 vi.mock('ai', () => ({
   generateText: vi.fn().mockRejectedValue(new Error('No auth configured')),
-  createGateway: vi.fn(() => {
-    // Return a function that creates a model when called
-    return (modelId: string) => ({ modelId })
-  }),
+  // Pre-configured gateway export - returns a function that creates a model
+  gateway: vi.fn((modelId: string) => ({ modelId })),
 }))
 
 describe('Chat API', () => {

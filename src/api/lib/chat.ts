@@ -8,15 +8,12 @@
  * Uses Vercel AI Gateway - no API key needed on Vercel deployments (OIDC auth)
  */
 
-import { createGateway, generateText } from 'ai'
+import { gateway, generateText } from 'ai'
 
-// Create Vercel AI Gateway provider
+// Vercel AI Gateway provider
 // See: https://ai-sdk.dev/providers/ai-sdk-providers/ai-gateway
 // On Vercel: OIDC auth is automatic
-// For local dev: set AI_GATEWAY_API_KEY env var
-const gateway = createGateway({
-  apiKey: process.env.AI_GATEWAY_API_KEY ?? '',
-})
+// For local dev: run 'vercel env pull' to get OIDC tokens
 
 const MAX_LIMIT = 10000
 const DEFAULT_LIMIT = 1000
