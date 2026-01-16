@@ -8,13 +8,24 @@
  * Uses Vercel AI Gateway - no API key needed on Vercel deployments (OIDC auth)
  */
 
-import { gateway } from '@ai-sdk/gateway'
+import { createGateway } from '@ai-sdk/gateway'
 import { generateText } from 'ai'
 
-// Vercel AI Gateway provider
+// Vercel AI Gateway provider - lazy initialization
 // See: https://ai-sdk.dev/providers/ai-sdk-providers/ai-gateway
 // On Vercel: OIDC auth is automatic
-// For local dev: run 'vercel env pull' to get OIDC tokens
+// For local dev: set AI_GATEWAY_API_KEY env var
+let _gateway: ReturnType<typeof createGateway> | null = null
+
+function getGateway() {
+  if (!_gateway) {
+    _gateway = createGateway({
+      // Empty string allows OIDC auth to be used on Vercel
+      apiKey: process.env.AI_GATEWAY_API_KEY ?? '',
+    })
+  }
+  return _gateway
+}
 
 const MAX_LIMIT = 10000
 const DEFAULT_LIMIT = 1000
@@ -119,7 +130,7 @@ export async function determineNeededQueries(question: string): Promise<Determin
 
   try {
     const result = await generateText({
-      model: gateway('anthropic/claude-3.5-haiku'),
+      model: getGateway()('anthropic/claude-3.5-haiku'),
       maxOutputTokens: 1024,
       system: buildSystemPrompt(),
       messages: [
@@ -198,7 +209,7 @@ export async function analyzeWithData(
 ): Promise<AnalyzeResult> {
   try {
     const result = await generateText({
-      model: gateway('anthropic/claude-3.5-haiku'),
+      model: getGateway()('anthropic/claude-3.5-haiku'),
       maxOutputTokens: 2048,
       system: `You are a network security analyst. Analyze the provided NetFlow data and answer the user's question. Be concise but thorough. Highlight any security concerns.`,
       messages: [

@@ -17,7 +17,10 @@ vi.mock('ai', () => ({
 
 // Mock the gateway package
 vi.mock('@ai-sdk/gateway', () => ({
-  gateway: vi.fn((modelId: string) => ({ modelId })),
+  createGateway: vi.fn(() => {
+    // Return a function that creates a model when called
+    return (modelId: string) => ({ modelId })
+  }),
 }))
 
 describe('Chat API', () => {
