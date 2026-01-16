@@ -113,7 +113,7 @@ export async function determineNeededQueries(question: string): Promise<Determin
 
   try {
     const result = await generateText({
-      model: 'anthropic/claude-haiku-3-5',
+      model: 'anthropic/claude-3.5-haiku',
       maxOutputTokens: 1024,
       system: buildSystemPrompt(),
       messages: [
@@ -192,7 +192,7 @@ export async function analyzeWithData(
 ): Promise<AnalyzeResult> {
   try {
     const result = await generateText({
-      model: 'anthropic/claude-haiku-3-5',
+      model: 'anthropic/claude-3.5-haiku',
       maxOutputTokens: 2048,
       system: `You are a network security analyst. Analyze the provided NetFlow data and answer the user's question. Be concise but thorough. Highlight any security concerns.`,
       messages: [
