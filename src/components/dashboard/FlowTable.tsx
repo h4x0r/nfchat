@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useCallback, memo } from 'react'
+import { useState, useMemo, useRef, useCallback, memo, useEffect } from 'react'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import {
   useReactTable,
@@ -212,6 +212,14 @@ export function FlowTable({
   })
 
   const { rows } = table.getRowModel()
+
+  // Reset pagination to page 0 when filters change
+  useEffect(() => {
+    if (currentPage !== undefined && currentPage > 0 && onPageChange) {
+      onPageChange(0)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [columnFilters])
 
   const virtualizer = useVirtualizer({
     count: rows.length,

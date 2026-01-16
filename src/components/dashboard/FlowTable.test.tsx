@@ -465,4 +465,74 @@ describe('FlowTable', () => {
       expect(handleCellClick).toHaveBeenCalledWith('L4_SRC_PORT', '4894')
     })
   })
+
+  // Pagination reset on filter tests
+  describe('pagination reset on filter', () => {
+    it('calls onPageChange(0) when filter is applied', () => {
+      const handlePageChange = vi.fn()
+      render(
+        <FlowTable
+          data={mockData}
+          currentPage={5}
+          totalPages={100}
+          onPageChange={handlePageChange}
+        />
+      )
+
+      // Apply a filter
+      const filterInputs = screen.getAllByPlaceholderText(/filter/i)
+      const srcIpFilter = filterInputs[0]
+      fireEvent.change(srcIpFilter, { target: { value: '59.166.0.2' } })
+
+      // Should reset pagination to page 0
+      expect(handlePageChange).toHaveBeenCalledWith(0)
+    })
+
+    it('calls onPageChange(0) when multi-select filter is applied', async () => {
+      const handlePageChange = vi.fn()
+      render(
+        <FlowTable
+          data={mockData}
+          currentPage={5}
+          totalPages={100}
+          onPageChange={handlePageChange}
+        />
+      )
+
+      // Open the Attack filter dropdown (button with "Filter..." text)
+      const attackFilterButton = screen.getByRole('button', { name: /filter/i })
+      fireEvent.click(attackFilterButton)
+
+      // Click on the "Benign" option in the popover (not the one in the table data)
+      // The popover options are inside a div with specific structure
+      const popoverContent = document.querySelector('[data-radix-popper-content-wrapper]')
+      const benignOption = popoverContent?.querySelector('.text-xs')?.closest('.cursor-pointer')
+      if (benignOption) {
+        fireEvent.click(benignOption)
+      }
+
+      // Should reset pagination to page 0
+      expect(handlePageChange).toHaveBeenCalledWith(0)
+    })
+
+    it('does not call onPageChange when already on page 0', () => {
+      const handlePageChange = vi.fn()
+      render(
+        <FlowTable
+          data={mockData}
+          currentPage={0}
+          totalPages={100}
+          onPageChange={handlePageChange}
+        />
+      )
+
+      // Apply a filter
+      const filterInputs = screen.getAllByPlaceholderText(/filter/i)
+      const srcIpFilter = filterInputs[0]
+      fireEvent.change(srcIpFilter, { target: { value: '59.166.0.2' } })
+
+      // Should not call onPageChange since already on page 0
+      expect(handlePageChange).not.toHaveBeenCalled()
+    })
+  })
 })
