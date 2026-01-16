@@ -1,5 +1,6 @@
-import { useCallback, useMemo } from 'react'
+import { useCallback, useMemo, useRef } from 'react'
 import { useStore } from '@/lib/store'
+import { useTablePageSize } from '@/hooks/useTablePageSize'
 import { chat } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
 import { Chat } from '../Chat'
@@ -23,6 +24,10 @@ const COLUMN_LABELS: Record<string, string> = {
  * Right: Chat panel (35%) always visible for NL queries
  */
 export function ForensicDashboard() {
+  // Ref for dynamic page size calculation
+  const tableContainerRef = useRef<HTMLDivElement>(null)
+  const dynamicPageSize = useTablePageSize(tableContainerRef)
+
   // Store state
   const allFlows = useStore((s) => s.flows)
   const hideBenign = useStore((s) => s.hideBenign)
@@ -32,11 +37,10 @@ export function ForensicDashboard() {
   const addMessage = useStore((s) => s.addMessage)
   const setIsLoading = useStore((s) => s.setIsLoading)
 
-  // Pagination state
+  // Pagination state (use dynamic page size)
   const currentPage = useStore((s) => s.currentPage)
-  const pageSize = useStore((s) => s.pageSize)
+  const pageSize = dynamicPageSize
   const setCurrentPage = useStore((s) => s.setCurrentPage)
-  const totalPages = useStore((s) => s.totalPages)
 
   // Filter and paginate flows
   const { flows, displayedTotalPages } = useMemo(() => {
@@ -118,7 +122,7 @@ export function ForensicDashboard() {
       {/* Split View: Table + Chat */}
       <div className="flex flex-1 min-h-0">
         {/* Left: Flow Table (65%) */}
-        <div className="w-[65%] border-r border-border overflow-hidden">
+        <div ref={tableContainerRef} className="w-[65%] border-r border-border overflow-hidden">
           <FlowTable
             data={flows}
             totalCount={totalFlowCount}
