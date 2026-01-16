@@ -8,24 +8,8 @@
  * Uses Vercel AI Gateway - no API key needed on Vercel deployments (OIDC auth)
  */
 
-import { createGateway } from '@ai-sdk/gateway'
-import { generateText } from 'ai'
-
-// Vercel AI Gateway provider - lazy initialization
-// See: https://ai-sdk.dev/providers/ai-sdk-providers/ai-gateway
-// On Vercel: OIDC auth is automatic
-// For local dev: set AI_GATEWAY_API_KEY env var
-let _gateway: ReturnType<typeof createGateway> | null = null
-
-function getGateway() {
-  if (!_gateway) {
-    _gateway = createGateway({
-      // Empty string allows OIDC auth to be used on Vercel
-      apiKey: process.env.AI_GATEWAY_API_KEY ?? '',
-    })
-  }
-  return _gateway
-}
+// AI Gateway temporarily disabled - using fallback mode only
+// TODO: Re-enable when Vercel AI Gateway OIDC issues are resolved
 
 const MAX_LIMIT = 10000
 const DEFAULT_LIMIT = 1000
@@ -116,7 +100,7 @@ interface DetermineQueriesResult {
 
 /**
  * Ask AI what queries it needs to answer the question
- * Uses Vercel AI Gateway - OIDC auth on Vercel, AI_GATEWAY_API_KEY for local dev
+ * Currently using keyword-based fallback mode (AI Gateway disabled)
  */
 export async function determineNeededQueries(question: string): Promise<DetermineQueriesResult> {
   // For simple greetings or non-data questions, return empty
@@ -128,39 +112,7 @@ export async function determineNeededQueries(question: string): Promise<Determin
     return { queries: [] }
   }
 
-  try {
-    const result = await generateText({
-      model: getGateway()('anthropic/claude-3.5-haiku'),
-      maxOutputTokens: 1024,
-      system: buildSystemPrompt(),
-      messages: [
-        {
-          role: 'user',
-          content: `I need to answer this question about network flow data: "${question}"
-
-Return a JSON object with:
-- queries: array of SQL SELECT queries needed to answer this question
-- reasoning: brief explanation of what data you need
-
-Only include queries that are necessary. Maximum 3 queries.`,
-        },
-      ],
-    })
-
-    // Extract JSON from response
-    const jsonMatch = result.text.match(/\{[\s\S]*\}/)
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0])
-      // Validate and sanitize each query
-      const validQueries = (parsed.queries || [])
-        .filter((q: string) => validateSQL(q))
-        .map((q: string) => sanitizeSQL(q))
-      return { queries: validQueries, reasoning: parsed.reasoning }
-    }
-  } catch (e) {
-    console.error('Failed to generate queries:', e)
-  }
-
+  // Use keyword-based fallback (AI Gateway temporarily disabled)
   return generateFallbackQueries(question)
 }
 
@@ -201,35 +153,14 @@ interface AnalyzeResult {
 
 /**
  * Analyze data with AI and return response
- * Uses Vercel AI Gateway - OIDC auth on Vercel, AI_GATEWAY_API_KEY for local dev
+ * Currently using placeholder response (AI Gateway disabled)
  */
 export async function analyzeWithData(
   question: string,
   data: unknown[]
 ): Promise<AnalyzeResult> {
-  try {
-    const result = await generateText({
-      model: getGateway()('anthropic/claude-3.5-haiku'),
-      maxOutputTokens: 2048,
-      system: `You are a network security analyst. Analyze the provided NetFlow data and answer the user's question. Be concise but thorough. Highlight any security concerns.`,
-      messages: [
-        {
-          role: 'user',
-          content: `Question: ${question}
-
-Data from queries:
-${JSON.stringify(data, null, 2)}
-
-Please analyze this data and answer the question. Focus on security implications.`,
-        },
-      ],
-    })
-
-    return { response: result.text }
-  } catch (e) {
-    console.error('Failed to analyze data:', e)
-    return {
-      response: `Based on the data provided, I can see ${data.length} records. AI analysis is temporarily unavailable.`,
-    }
+  // AI Gateway temporarily disabled - return placeholder
+  return {
+    response: `Based on the data provided, I can see ${data.length} records. AI analysis is temporarily unavailable.`,
   }
 }

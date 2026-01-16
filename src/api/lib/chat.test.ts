@@ -10,18 +10,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 
-// Mock the ai module to simulate network errors (triggers fallback)
-vi.mock('ai', () => ({
-  generateText: vi.fn().mockRejectedValue(new Error('No auth configured')),
-}))
-
-// Mock the gateway package
-vi.mock('@ai-sdk/gateway', () => ({
-  createGateway: vi.fn(() => {
-    // Return a function that creates a model when called
-    return (modelId: string) => ({ modelId })
-  }),
-}))
+// No mocks needed - AI Gateway is temporarily disabled
+// The chat module uses keyword-based fallback only
 
 describe('Chat API', () => {
   const originalEnv = process.env
