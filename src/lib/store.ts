@@ -207,9 +207,22 @@ export const useStore = create<AppState>((set) => ({
 }));
 
 // Selector for filtered flows (computed from hideBenign state)
+// Limit to 10K rows for performance - filtering millions client-side is too slow
+const MAX_DISPLAY_ROWS = 10000;
+
 export const selectFilteredFlows = (state: AppState): Partial<FlowRecord>[] => {
-  if (!state.hideBenign) return state.flows;
-  return state.flows.filter((f) => f.Attack !== 'Benign');
+  const flows = state.flows;
+  if (!state.hideBenign) {
+    return flows.length <= MAX_DISPLAY_ROWS ? flows : flows.slice(0, MAX_DISPLAY_ROWS);
+  }
+  // Filter and limit - use for loop for better performance on large arrays
+  const result: Partial<FlowRecord>[] = [];
+  for (let i = 0; i < flows.length && result.length < MAX_DISPLAY_ROWS; i++) {
+    if (flows[i].Attack !== 'Benign') {
+      result.push(flows[i]);
+    }
+  }
+  return result;
 };
 
 // Selector for building SQL WHERE clause from filters
