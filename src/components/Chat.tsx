@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from 'react'
 import { Send, X, Loader2 } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import type { ChatMessage } from '@/lib/store'
 
@@ -58,7 +58,7 @@ export function Chat({ messages, onSend, onClose, isLoading = false }: ChatProps
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+      <div ref={scrollRef} className="flex-1 overflow-y-auto p-4">
         <div className="space-y-4">
           {messages.map((message) => (
             <MessageBubble key={message.id} message={message} onPivot={onSend} />
@@ -70,7 +70,7 @@ export function Chat({ messages, onSend, onClose, isLoading = false }: ChatProps
             </div>
           )}
         </div>
-      </ScrollArea>
+      </div>
 
       {/* Input */}
       <div className="p-4 border-t">
@@ -114,7 +114,13 @@ function MessageBubble({ message, onPivot }: MessageBubbleProps) {
             : 'bg-muted'
         )}
       >
-        <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        {isUser ? (
+          <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+        ) : (
+          <div className="text-sm prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-ol:my-1 prose-li:my-0 prose-headings:my-2 prose-pre:my-2 prose-code:text-xs">
+            <ReactMarkdown>{message.content}</ReactMarkdown>
+          </div>
+        )}
 
         {/* SQL Query */}
         {message.sql && (

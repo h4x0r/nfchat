@@ -141,5 +141,5 @@
 
 /* Logo - matches CRT green text color (#00ff00), black stays black */
 .crt-logo {
-  filter: grayscale(1) contrast(10) sepia(1) saturate(10000%) hue-rotate(70deg);
+  filter: grayscale(1) contrast(1.5) sepia(1) saturate(20) hue-rotate(70deg) brightness(1.1);
 }
