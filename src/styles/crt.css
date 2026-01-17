@@ -1,0 +1,140 @@
+/**
+ * CRT Terminal Aesthetic
+ * Green phosphor on black with glow effects
+ */
+
+:root {
+  --crt-black: #0a0a0a;
+  --crt-green: #00ff00;
+  --crt-green-dim: #00aa00;
+  --crt-green-dark: #005500;
+  --crt-red: #ff3333;
+  --crt-glow: 0 0 5px #00ff00, 0 0 10px #00ff0040;
+  --crt-glow-dim: 0 0 3px #00aa00;
+}
+
+/* Base CRT container */
+.crt-container {
+  background-color: var(--crt-black);
+  color: var(--crt-green);
+  font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+  min-height: 100vh;
+}
+
+/* Glowing text */
+.crt-glow {
+  text-shadow: var(--crt-glow);
+}
+
+.crt-glow-dim {
+  color: var(--crt-green-dim);
+  text-shadow: var(--crt-glow-dim);
+}
+
+/* Scanline overlay */
+.crt-scanlines {
+  position: relative;
+}
+
+.crt-scanlines::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.15),
+    rgba(0, 0, 0, 0.15) 1px,
+    transparent 1px,
+    transparent 2px
+  );
+  pointer-events: none;
+}
+
+/* Blinking cursor */
+.crt-cursor::after {
+  content: '_';
+  animation: crt-blink 1s step-end infinite;
+}
+
+@keyframes crt-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* Status indicators */
+.crt-status-ok {
+  color: var(--crt-green);
+  text-shadow: var(--crt-glow);
+}
+
+.crt-status-fail {
+  color: var(--crt-red);
+  text-shadow: 0 0 5px #ff3333, 0 0 10px #ff333340;
+}
+
+.crt-status-pending {
+  color: var(--crt-green-dim);
+  animation: crt-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes crt-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Progress bar */
+.crt-progress {
+  background-color: var(--crt-green-dark);
+  height: 1.25rem;
+  border: 1px solid var(--crt-green-dim);
+}
+
+.crt-progress-bar {
+  background-color: var(--crt-green);
+  height: 100%;
+  box-shadow: var(--crt-glow);
+  transition: width 0.3s ease;
+}
+
+/* Dropzone */
+.crt-dropzone {
+  border: 2px dashed var(--crt-green-dim);
+  background-color: transparent;
+  transition: all 0.2s ease;
+}
+
+.crt-dropzone:hover,
+.crt-dropzone-active {
+  border-color: var(--crt-green);
+  background-color: rgba(0, 255, 0, 0.05);
+  box-shadow: inset 0 0 20px rgba(0, 255, 0, 0.1);
+}
+
+/* Links */
+.crt-link {
+  color: var(--crt-green-dim);
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.crt-link:hover {
+  color: var(--crt-green);
+  text-shadow: var(--crt-glow);
+}
+
+/* Button */
+.crt-button {
+  background-color: transparent;
+  color: var(--crt-green);
+  border: 1px solid var(--crt-green);
+  padding: 0.5rem 1rem;
+  font-family: inherit;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.crt-button:hover {
+  background-color: var(--crt-green);
+  color: var(--crt-black);
+  box-shadow: var(--crt-glow);
+}
