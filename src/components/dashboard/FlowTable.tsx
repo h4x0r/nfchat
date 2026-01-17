@@ -9,6 +9,7 @@ import {
   type ColumnDef,
   type SortingState,
   type ColumnFiltersState,
+  type OnChangeFn,
 } from '@tanstack/react-table'
 import { Loader2, ArrowUp, ArrowDown, ArrowUpDown, ChevronLeft, ChevronRight } from 'lucide-react'
 import {
@@ -43,6 +44,9 @@ interface FlowTableProps {
   currentPage?: number
   totalPages?: number
   onPageChange?: (page: number) => void
+  // Controlled column filters for server-side filtering
+  columnFilters?: ColumnFiltersState
+  onColumnFiltersChange?: OnChangeFn<ColumnFiltersState>
 }
 
 // Memoized row component to prevent unnecessary re-renders
@@ -107,13 +111,21 @@ export function FlowTable({
   currentPage,
   totalPages,
   onPageChange,
+  columnFilters: controlledColumnFilters,
+  onColumnFiltersChange,
 }: FlowTableProps) {
   // Check if pagination is enabled
   const hasPagination = currentPage !== undefined && totalPages !== undefined && onPageChange !== undefined
+  // Check if column filters are controlled externally (server-side filtering)
+  const isControlled = controlledColumnFilters !== undefined && onColumnFiltersChange !== undefined
   // All hooks must be called unconditionally at the top
   const parentRef = useRef<HTMLDivElement>(null)
   const [sorting, setSorting] = useState<SortingState>([])
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+  const [internalColumnFilters, setInternalColumnFilters] = useState<ColumnFiltersState>([])
+
+  // Use controlled or internal state
+  const columnFilters = isControlled ? controlledColumnFilters : internalColumnFilters
+  const setColumnFilters = isControlled ? onColumnFiltersChange : setInternalColumnFilters
 
   const columns = useMemo<ColumnDef<Partial<FlowRecord>>[]>(
     () => [
@@ -213,13 +225,14 @@ export function FlowTable({
 
   const { rows } = table.getRowModel()
 
-  // Reset pagination to page 0 when filters change
+  // Reset pagination to page 0 when filters change (uncontrolled mode only)
+  // In controlled mode, ForensicDashboard handles this for server-side filtering
   useEffect(() => {
-    if (currentPage !== undefined && currentPage > 0 && onPageChange) {
+    if (!isControlled && currentPage !== undefined && currentPage > 0 && onPageChange) {
       onPageChange(0)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [columnFilters])
+  }, [internalColumnFilters, isControlled])
 
   const virtualizer = useVirtualizer({
     count: rows.length,

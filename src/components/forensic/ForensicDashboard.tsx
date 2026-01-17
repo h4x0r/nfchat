@@ -5,6 +5,7 @@ import { chat, getFlows } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
 import { Chat } from '../Chat'
 import { StatsBar } from './StatsBar'
+import type { ColumnFiltersState } from '@tanstack/react-table'
 
 // Column name mappings for readable filter messages
 const COLUMN_LABELS: Record<string, string> = {
@@ -16,6 +17,30 @@ const COLUMN_LABELS: Record<string, string> = {
   Attack: 'attack type',
   IN_BYTES: 'in bytes',
   OUT_BYTES: 'out bytes',
+}
+
+/**
+ * Build SQL WHERE clause from column filters.
+ * Handles both string filters (LIKE) and array filters (IN).
+ */
+function buildColumnFilterSQL(filters: ColumnFiltersState): string {
+  const conditions: string[] = []
+
+  for (const filter of filters) {
+    const { id, value } = filter
+
+    if (Array.isArray(value) && value.length > 0) {
+      // Array filter (e.g., Attack multi-select) → IN clause
+      const escaped = value.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(', ')
+      conditions.push(`${id} IN (${escaped})`)
+    } else if (typeof value === 'string' && value.trim().length > 0) {
+      // String filter → LIKE clause for partial matching
+      const escaped = value.replace(/'/g, "''").replace(/%/g, '\\%').replace(/_/g, '\\_')
+      conditions.push(`${id} LIKE '%${escaped}%'`)
+    }
+  }
+
+  return conditions.join(' AND ')
 }
 
 /**
@@ -33,6 +58,9 @@ export function ForensicDashboard() {
   const [filteredTotalCount, setFilteredTotalCount] = useState(0)
   const [pageLoading, setPageLoading] = useState(false)
 
+  // Column filters state - lifted from FlowTable for server-side filtering
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
   // Store state
   const hideBenign = useStore((s) => s.hideBenign)
   const messages = useStore((s) => s.messages)
@@ -48,7 +76,7 @@ export function ForensicDashboard() {
   // Calculate total pages from filtered count
   const displayedTotalPages = Math.ceil(filteredTotalCount / pageSize) || 1
 
-  // Server-side filter and paginate - reload when hideBenign, page, or pageSize changes
+  // Server-side filter and paginate - reload when hideBenign, columnFilters, page, or pageSize changes
   // Uses lightweight getFlows endpoint (only 2 queries vs 6 in getDashboardData)
   useEffect(() => {
     let cancelled = false
@@ -56,7 +84,17 @@ export function ForensicDashboard() {
     async function loadPage() {
       setPageLoading(true)
       try {
-        const whereClause = hideBenign ? "Attack != 'Benign'" : '1=1'
+        // Build combined WHERE clause from hideBenign + column filters
+        const conditions: string[] = []
+        if (hideBenign) {
+          conditions.push("Attack != 'Benign'")
+        }
+        const columnFilterSQL = buildColumnFilterSQL(columnFilters)
+        if (columnFilterSQL) {
+          conditions.push(columnFilterSQL)
+        }
+        const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
+
         const data = await getFlows({
           whereClause,
           limit: pageSize,
@@ -81,7 +119,7 @@ export function ForensicDashboard() {
     return () => {
       cancelled = true
     }
-  }, [hideBenign, currentPage, pageSize])
+  }, [hideBenign, columnFilters, currentPage, pageSize])
 
   // Track previous hideBenign to detect changes (not initial mount)
   const prevHideBenignRef = useRef(hideBenign)
@@ -94,6 +132,22 @@ export function ForensicDashboard() {
       }
     }
   }, [hideBenign, currentPage, setCurrentPage])
+
+  // Handle column filter changes - update state and reset pagination
+  // TanStack Table's onChange can receive a value OR an updater function
+  const handleColumnFiltersChange = useCallback(
+    (updaterOrValue: ColumnFiltersState | ((old: ColumnFiltersState) => ColumnFiltersState)) => {
+      const newFilters = typeof updaterOrValue === 'function'
+        ? updaterOrValue(columnFilters)
+        : updaterOrValue
+      setColumnFilters(newFilters)
+      // Reset to page 0 when filters change
+      if (currentPage !== 0) {
+        setCurrentPage(0)
+      }
+    },
+    [columnFilters, currentPage, setCurrentPage]
+  )
 
   // Process a chat message through the AI
   const processChat = useCallback(
@@ -168,6 +222,8 @@ export function ForensicDashboard() {
             currentPage={currentPage}
             totalPages={displayedTotalPages}
             onPageChange={setCurrentPage}
+            columnFilters={columnFilters}
+            onColumnFiltersChange={handleColumnFiltersChange}
           />
         </div>
 
