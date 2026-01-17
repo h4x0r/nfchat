@@ -77,12 +77,75 @@ async function verifyTurnstileToken(
 // Inlined from src/api/lib/chat.ts (fallback mode only)
 // ============================================================================
 
+const DEFAULT_LIMIT = 1000
+
+// Mapping from readable filter labels to SQL column names
+const FILTER_LABEL_TO_COLUMN: Record<string, string> = {
+  'source ip': 'IPV4_SRC_ADDR',
+  'destination ip': 'IPV4_DST_ADDR',
+  'src ip': 'IPV4_SRC_ADDR',
+  'dst ip': 'IPV4_DST_ADDR',
+  'source port': 'L4_SRC_PORT',
+  'destination port': 'L4_DST_PORT',
+  'src port': 'L4_SRC_PORT',
+  'dst port': 'L4_DST_PORT',
+  'protocol': 'PROTOCOL',
+  'attack type': 'Attack',
+  'attack': 'Attack',
+  'in bytes': 'IN_BYTES',
+  'out bytes': 'OUT_BYTES',
+}
+
+// Columns that should be treated as numeric (no quotes around value)
+const NUMERIC_COLUMNS = new Set([
+  'L4_SRC_PORT',
+  'L4_DST_PORT',
+  'PROTOCOL',
+  'IN_BYTES',
+  'OUT_BYTES',
+  'IN_PKTS',
+  'OUT_PKTS',
+  'TCP_FLAGS',
+  'Label',
+])
+
 interface DetermineQueriesResult {
   queries: string[]
   reasoning?: string
 }
 
+/**
+ * Parse "Filter by X = Y" patterns from click-to-filter actions
+ */
+function parseFilterPattern(question: string): string | null {
+  const match = question.match(/^filter by\s+(.+?)\s*=\s*(.+)$/i)
+  if (!match) return null
+
+  const [, labelPart, valuePart] = match
+  const label = labelPart.trim().toLowerCase()
+  const value = valuePart.trim()
+
+  const columnName = FILTER_LABEL_TO_COLUMN[label]
+  if (!columnName) return null
+
+  let whereCondition: string
+  if (NUMERIC_COLUMNS.has(columnName)) {
+    whereCondition = `${columnName} = ${value}`
+  } else {
+    const escapedValue = value.replace(/'/g, "''")
+    whereCondition = `${columnName} = '${escapedValue}'`
+  }
+
+  return `SELECT * FROM flows WHERE ${whereCondition} LIMIT ${DEFAULT_LIMIT}`
+}
+
 function generateFallbackQueries(question: string): DetermineQueriesResult {
+  // First, check for "Filter by X = Y" pattern (click-to-filter)
+  const filterQuery = parseFilterPattern(question)
+  if (filterQuery) {
+    return { queries: [filterQuery] }
+  }
+
   const lowerQuestion = question.toLowerCase()
   const queries: string[] = []
 
