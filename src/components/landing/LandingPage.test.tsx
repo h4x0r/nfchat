@@ -44,6 +44,7 @@ describe('LandingPage', () => {
 
       expect(screen.getByTestId('crt-dropzone')).toBeInTheDocument()
       expect(screen.getByText(/drop file here/i)).toBeInTheDocument()
+      expect(screen.getByText(/CSV, Parquet, or ZIP/i)).toBeInTheDocument()
     })
 
     it('renders demo data link', () => {

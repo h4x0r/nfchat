@@ -72,7 +72,7 @@ export function CRTDropzone({ onFileDrop, disabled = false }: CRTDropzoneProps) 
         ref={inputRef}
         data-testid="crt-dropzone-input"
         type="file"
-        accept=".csv,.parquet"
+        accept=".csv,.parquet,.zip"
         onChange={handleFileChange}
         className="hidden"
       />
@@ -81,7 +81,7 @@ export function CRTDropzone({ onFileDrop, disabled = false }: CRTDropzoneProps) 
         DROP FILE HERE
       </div>
       <div className="crt-glow-dim text-sm">
-        csv, parquet
+        CSV, Parquet, or ZIP
       </div>
     </div>
   )

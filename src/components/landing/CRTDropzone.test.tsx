@@ -8,7 +8,7 @@ describe('CRTDropzone', () => {
       render(<CRTDropzone onFileDrop={vi.fn()} />)
 
       expect(screen.getByText(/drop file here/i)).toBeInTheDocument()
-      expect(screen.getByText(/csv, parquet/i)).toBeInTheDocument()
+      expect(screen.getByText(/CSV, Parquet, or ZIP/i)).toBeInTheDocument()
     })
 
     it('has correct test id', () => {
@@ -180,11 +180,25 @@ describe('CRTDropzone', () => {
       expect(onFileDrop).toHaveBeenCalled()
     })
 
-    it('file input accepts only csv and parquet', () => {
+    it('file input accepts csv, parquet, and zip', () => {
       render(<CRTDropzone onFileDrop={vi.fn()} />)
 
       const input = screen.getByTestId('crt-dropzone-input')
-      expect(input).toHaveAttribute('accept', '.csv,.parquet')
+      expect(input).toHaveAttribute('accept', '.csv,.parquet,.zip')
+    })
+
+    it('accepts ZIP files', () => {
+      const onFileDrop = vi.fn()
+      render(<CRTDropzone onFileDrop={onFileDrop} />)
+
+      const dropzone = screen.getByTestId('crt-dropzone')
+      const file = new File(['zipdata'], 'data.zip', { type: 'application/zip' })
+
+      fireEvent.drop(dropzone, {
+        dataTransfer: { files: [file] },
+      })
+
+      expect(onFileDrop).toHaveBeenCalled()
     })
 
     it('accepts files with uppercase extensions', () => {
@@ -222,7 +236,7 @@ describe('CRTDropzone', () => {
 
       const input = screen.getByTestId('crt-dropzone-input')
       expect(input).toHaveAttribute('type', 'file')
-      expect(input).toHaveAttribute('accept', '.csv,.parquet')
+      expect(input).toHaveAttribute('accept', '.csv,.parquet,.zip')
     })
 
     it('calls onFileDrop when file selected via input', () => {
