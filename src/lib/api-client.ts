@@ -3,10 +3,20 @@
  *
  * Calls backend API endpoints instead of connecting directly to MotherDuck.
  * This keeps the token secure on the server side.
+ *
+ * Features:
+ * - Structured error handling with AppError
+ * - Request tracing with X-Request-ID headers
+ * - Retry detection for network errors
  */
 
 import type { DashboardData } from '@/api/routes/motherduck'
 import type { ProgressCallback, LogCallback } from './progress'
+import { type AppError, Errors, isAppError } from './errors'
+import { createTraceContext, type TraceContext } from './tracing'
+import { logger } from './logger'
+
+const apiLogger = logger.child('API')
 
 // ─────────────────────────────────────────────────────────────
 // Types
@@ -20,13 +30,13 @@ export interface LoadDataOptions {
 interface LoadResponse {
   success: boolean
   rowCount?: number
-  error?: string
+  error?: string | AppError
 }
 
 interface DashboardResponse {
   success: boolean
   data?: DashboardData
-  error?: string
+  error?: string | AppError
 }
 
 interface FlowsResponse {
@@ -35,46 +45,133 @@ interface FlowsResponse {
     flows: Record<string, unknown>[]
     totalCount: number
   }
-  error?: string
+  error?: string | AppError
 }
 
 interface QueryResponse {
   success: boolean
   data?: Record<string, unknown>[]
-  error?: string
+  error?: string | AppError
 }
 
 interface ChatQueryResponse {
   success: boolean
   queries?: string[]
   reasoning?: string
-  error?: string
+  error?: string | AppError
 }
 
 interface ChatAnalyzeResponse {
   success: boolean
   response?: string
-  error?: string
+  error?: string | AppError
+}
+
+// ─────────────────────────────────────────────────────────────
+// ApiError Class
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * API error with structured error information.
+ * Wraps an AppError with additional context.
+ */
+export class ApiError extends Error {
+  constructor(public readonly appError: AppError) {
+    super(appError.message)
+    this.name = 'ApiError'
+  }
+
+  /**
+   * Whether this error might succeed if retried.
+   * True for network and external service errors.
+   */
+  get isRetryable(): boolean {
+    return ['network', 'external'].includes(this.appError.category)
+  }
+}
+
+/**
+ * Type guard for ApiError
+ */
+export function isApiError(value: unknown): value is ApiError {
+  return value instanceof ApiError
+}
+
+// ─────────────────────────────────────────────────────────────
+// Error Parsing
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse error from API response, handling both legacy (string) and structured (AppError) formats.
+ */
+function parseError(error: unknown, status: number, correlationId: string): AppError {
+  // If already a structured AppError, use it
+  if (isAppError(error)) {
+    return { ...error, correlationId: error.correlationId ?? correlationId }
+  }
+
+  // Legacy string error - wrap in AppError
+  const message = typeof error === 'string' ? error : 'Request failed'
+  const category = status >= 500 ? 'internal' : 'validation'
+
+  return {
+    code: status >= 500 ? 'INTERNAL_ERROR' : 'VALIDATION_ERROR',
+    message,
+    category,
+    correlationId,
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
 
-async function apiPost<T>(endpoint: string, body: Record<string, unknown>): Promise<T> {
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+async function apiPost<T>(
+  endpoint: string,
+  body: Record<string, unknown>,
+  trace?: TraceContext
+): Promise<T> {
+  const ctx = trace ?? createTraceContext(`POST:${endpoint}`)
 
-  const data = await response.json()
+  apiLogger.debug('Request', { requestId: ctx.requestId, endpoint })
 
-  if (!response.ok || !data.success) {
-    throw new Error(data.error || 'API request failed')
+  try {
+    const response = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Request-ID': ctx.requestId,
+      },
+      body: JSON.stringify(body),
+    })
+
+    const data = await response.json()
+    const elapsed = performance.now() - ctx.startTime
+
+    apiLogger.debug('Response', {
+      requestId: ctx.requestId,
+      status: response.status,
+      ms: Math.round(elapsed),
+    })
+
+    if (!response.ok || !data.success) {
+      throw new ApiError(parseError(data.error, response.status, ctx.requestId))
+    }
+
+    return data
+  } catch (err) {
+    // Re-throw ApiError as-is
+    if (err instanceof ApiError) {
+      throw err
+    }
+
+    // Wrap network errors
+    const networkError = Errors.network(
+      err instanceof Error ? err.message : 'Network request failed',
+      { correlationId: ctx.requestId }
+    )
+    throw new ApiError(networkError)
   }
-
-  return data
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -150,7 +247,7 @@ export async function getDashboardData(options?: {
   })
 
   if (!response.data) {
-    throw new Error('No data returned from dashboard endpoint')
+    throw new ApiError(Errors.internal('No data returned from dashboard endpoint'))
   }
 
   return response.data
@@ -174,7 +271,7 @@ export async function getFlows(options?: {
   })
 
   if (!response.data) {
-    throw new Error('No data returned from flows endpoint')
+    throw new ApiError(Errors.internal('No data returned from flows endpoint'))
   }
 
   return response.data
@@ -189,7 +286,7 @@ export async function executeQuery<T = Record<string, unknown>>(
   const response = await apiPost<QueryResponse>('/api/motherduck/query', { sql })
 
   if (!response.data) {
-    throw new Error('No data returned from query endpoint')
+    throw new ApiError(Errors.internal('No data returned from query endpoint'))
   }
 
   return response.data as T[]

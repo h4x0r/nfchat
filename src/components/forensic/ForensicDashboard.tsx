@@ -5,7 +5,13 @@ import { chat, getFlows } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
 import { Chat } from '../Chat'
 import { StatsBar } from './StatsBar'
+import { KillChainTimeline } from './KillChainTimeline'
+import { logger } from '@/lib/logger'
+import { WhereClauseBuilder } from '@/lib/sql'
 import type { ColumnFiltersState } from '@tanstack/react-table'
+import type { AttackSession } from '@/lib/motherduck/types'
+
+const dashboardLogger = logger.child('Dashboard')
 
 // Column name mappings for readable filter messages
 const COLUMN_LABELS: Record<string, string> = {
@@ -20,27 +26,26 @@ const COLUMN_LABELS: Record<string, string> = {
 }
 
 /**
- * Build SQL WHERE clause from column filters.
+ * Build SQL WHERE clause from column filters using safe SQL builder.
  * Handles both string filters (LIKE) and array filters (IN).
  */
 function buildColumnFilterSQL(filters: ColumnFiltersState): string {
-  const conditions: string[] = []
+  const builder = new WhereClauseBuilder()
 
   for (const filter of filters) {
     const { id, value } = filter
 
     if (Array.isArray(value) && value.length > 0) {
       // Array filter (e.g., Attack multi-select) → IN clause
-      const escaped = value.map((v) => `'${String(v).replace(/'/g, "''")}'`).join(', ')
-      conditions.push(`${id} IN (${escaped})`)
+      builder.addInClause(id, value.map(String))
     } else if (typeof value === 'string' && value.trim().length > 0) {
       // String filter → LIKE clause for partial matching
-      const escaped = value.replace(/'/g, "''").replace(/%/g, '\\%').replace(/_/g, '\\_')
-      conditions.push(`${id} LIKE '%${escaped}%'`)
+      builder.addLike(id, value)
     }
   }
 
-  return conditions.join(' AND ')
+  // Return empty string if no conditions (not '1=1' since this appends to existing)
+  return builder.hasConditions() ? builder.build() : ''
 }
 
 /**
@@ -57,9 +62,14 @@ export function ForensicDashboard() {
   const [pageFlows, setPageFlows] = useState<Partial<import('@/lib/schema').FlowRecord>[]>([])
   const [filteredTotalCount, setFilteredTotalCount] = useState(0)
   const [pageLoading, setPageLoading] = useState(false)
+  const [pageError, setPageError] = useState<string | null>(null)
 
   // Column filters state - lifted from FlowTable for server-side filtering
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
+
+  // Kill Chain Timeline panel state
+  const [showKillChain, setShowKillChain] = useState(false)
+  const [selectedSession, setSelectedSession] = useState<AttackSession | null>(null)
 
   // Store state
   const hideBenign = useStore((s) => s.hideBenign)
@@ -83,6 +93,7 @@ export function ForensicDashboard() {
 
     async function loadPage() {
       setPageLoading(true)
+      setPageError(null)
       try {
         // Build combined WHERE clause from hideBenign + column filters
         const conditions: string[] = []
@@ -106,7 +117,16 @@ export function ForensicDashboard() {
           setFilteredTotalCount(data.totalCount)
         }
       } catch (error) {
-        console.error('Failed to load page:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Failed to load data'
+        dashboardLogger.error('Failed to load page', {
+          error: errorMessage,
+          page: currentPage,
+          pageSize,
+          hideBenign,
+        })
+        if (!cancelled) {
+          setPageError(errorMessage)
+        }
       } finally {
         if (!cancelled) {
           setPageLoading(false)
@@ -203,7 +223,16 @@ export function ForensicDashboard() {
       <header className="flex items-center justify-between px-4 py-2 border-b border-border">
         <h1 className="text-lg font-semibold">nfchat</h1>
         <div className="flex items-center gap-2">
-          {/* Settings button placeholder */}
+          <button
+            onClick={() => setShowKillChain(!showKillChain)}
+            className={`px-3 py-1 text-sm rounded border transition-colors ${
+              showKillChain
+                ? 'bg-primary text-primary-foreground border-primary'
+                : 'border-border hover:bg-muted'
+            }`}
+          >
+            {showKillChain ? '✕ Kill Chain' : '⚔ Kill Chain'}
+          </button>
         </div>
       </header>
 
@@ -217,6 +246,8 @@ export function ForensicDashboard() {
           <FlowTable
             data={pageFlows}
             loading={pageLoading}
+            error={pageError}
+            onRetry={() => setCurrentPage(currentPage)}
             totalCount={filteredTotalCount}
             onCellClick={handleCellClick}
             currentPage={currentPage}
@@ -227,13 +258,25 @@ export function ForensicDashboard() {
           />
         </div>
 
-        {/* Right: Chat Panel (35%) */}
-        <div className="w-[35%] overflow-hidden">
-          <Chat
-            messages={messages}
-            onSend={handleChatSend}
-            isLoading={isLoading}
-          />
+        {/* Right: Chat or Kill Chain Panel (35%) */}
+        <div className="w-[35%] overflow-hidden flex flex-col">
+          {showKillChain ? (
+            <KillChainTimeline
+              onSessionSelect={(session) => {
+                setSelectedSession(session)
+                // Optionally filter flows to this session
+                const query = `Show flows from ${session.src_ip} between ${new Date(session.start_time).toISOString()} and ${new Date(session.end_time).toISOString()}`
+                processChat(query)
+              }}
+              className="h-full"
+            />
+          ) : (
+            <Chat
+              messages={messages}
+              onSend={handleChatSend}
+              isLoading={isLoading}
+            />
+          )}
         </div>
       </div>
     </div>
