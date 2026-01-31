@@ -28,7 +28,7 @@ export function LandingPage({ onDataReady }: LandingPageProps) {
   }, [onDataReady])
 
   const handleDemoClick = useCallback(() => {
-    setFileName('NF-UNSW-NB15-v3.parquet')
+    setFileName('UWF-ZeekData24.parquet')
     setState('loading')
     setProgress(0)
     setLogs([{ message: 'Connecting to MotherDuck...', status: 'pending' }])

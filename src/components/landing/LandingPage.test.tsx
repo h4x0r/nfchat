@@ -221,7 +221,7 @@ describe('LandingPage', () => {
       fireEvent.click(demoLink)
 
       await waitFor(() => {
-        expect(screen.getByText(/NF-UNSW-NB15-v3\.parquet/i)).toBeInTheDocument()
+        expect(screen.getByText(/UWF-ZeekData24\.parquet/i)).toBeInTheDocument()
       })
     })
   })

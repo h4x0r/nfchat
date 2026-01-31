@@ -39,7 +39,7 @@ function App() {
   const handleDataReady = useCallback((source: { type: 'file'; file: File } | { type: 'url'; url: string }) => {
     if (source.type === 'url') {
       const fileName = source.url === DEMO_PARQUET_URL
-        ? 'NF-UNSW-NB15-v3.parquet'
+        ? 'UWF-ZeekData24.parquet'
         : source.url.split('/').pop() || 'data.parquet'
       setDataSource({ type: 'url', url: source.url, fileName })
     } else {

@@ -277,7 +277,7 @@ describe('App', () => {
       fireEvent.click(screen.getByText(/demo dataset/i))
 
       await waitFor(() => {
-        expect(screen.getByText(/NF-UNSW-NB15-v3\.parquet/i)).toBeInTheDocument()
+        expect(screen.getByText(/UWF-ZeekData24\.parquet/i)).toBeInTheDocument()
       })
     })
 
@@ -678,7 +678,7 @@ describe('App', () => {
       fireEvent.click(screen.getByText(/demo dataset/i))
 
       await waitFor(() => {
-        expect(screen.getByText(/NF-UNSW-NB15-v3\.parquet/i)).toBeInTheDocument()
+        expect(screen.getByText(/UWF-ZeekData24\.parquet/i)).toBeInTheDocument()
       })
     })
   })
@@ -877,7 +877,7 @@ describe('App', () => {
 
       await waitFor(() => {
         // Should render without error
-        expect(screen.getByText(/NF-UNSW-NB15-v3\.parquet/i)).toBeInTheDocument()
+        expect(screen.getByText(/UWF-ZeekData24\.parquet/i)).toBeInTheDocument()
         expect(screen.queryByText('[OK]')).not.toBeInTheDocument()
         expect(screen.queryByText('[..]')).not.toBeInTheDocument()
       })
