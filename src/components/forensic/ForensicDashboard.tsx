@@ -1,17 +1,30 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, lazy, Suspense } from 'react'
 import { useStore } from '@/lib/store'
 import { useTablePageSize } from '@/hooks/useTablePageSize'
 import { chat, getFlows } from '@/lib/api-client'
 import { FlowTable } from '../dashboard/FlowTable'
-import { Chat } from '../Chat'
 import { StatsBar } from './StatsBar'
-import { KillChainTimeline } from './KillChainTimeline'
 import { logger } from '@/lib/logger'
 import { WhereClauseBuilder } from '@/lib/sql'
 import type { ColumnFiltersState } from '@tanstack/react-table'
 import type { AttackSession } from '@/lib/motherduck/types'
 
+// Lazy load heavy components - Chat pulls in react-markdown, KillChainTimeline is complex
+const Chat = lazy(() => import('../Chat').then(m => ({ default: m.Chat })))
+const KillChainTimeline = lazy(() => import('./KillChainTimeline').then(m => ({ default: m.KillChainTimeline })))
+
 const dashboardLogger = logger.child('Dashboard')
+
+/**
+ * Suspense fallback for lazy-loaded side panels.
+ */
+function PanelLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center h-full text-muted-foreground">
+      Loading...
+    </div>
+  )
+}
 
 // Column name mappings for readable filter messages
 const COLUMN_LABELS: Record<string, string> = {
@@ -260,23 +273,25 @@ export function ForensicDashboard() {
 
         {/* Right: Chat or Kill Chain Panel (35%) */}
         <div className="w-[35%] overflow-hidden flex flex-col">
-          {showKillChain ? (
-            <KillChainTimeline
-              onSessionSelect={(session) => {
-                setSelectedSession(session)
-                // Optionally filter flows to this session
-                const query = `Show flows from ${session.src_ip} between ${new Date(session.start_time).toISOString()} and ${new Date(session.end_time).toISOString()}`
-                processChat(query)
-              }}
-              className="h-full"
-            />
-          ) : (
-            <Chat
-              messages={messages}
-              onSend={handleChatSend}
-              isLoading={isLoading}
-            />
-          )}
+          <Suspense fallback={<PanelLoadingFallback />}>
+            {showKillChain ? (
+              <KillChainTimeline
+                onSessionSelect={(session) => {
+                  setSelectedSession(session)
+                  // Optionally filter flows to this session
+                  const query = `Show flows from ${session.src_ip} between ${new Date(session.start_time).toISOString()} and ${new Date(session.end_time).toISOString()}`
+                  processChat(query)
+                }}
+                className="h-full"
+              />
+            ) : (
+              <Chat
+                messages={messages}
+                onSend={handleChatSend}
+                isLoading={isLoading}
+              />
+            )}
+          </Suspense>
         </div>
       </div>
     </div>

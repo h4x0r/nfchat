@@ -69,17 +69,23 @@ describe('ForensicDashboard', () => {
     expect(screen.getByTestId('flow-table-mock')).toBeInTheDocument()
   })
 
-  it('displays the chat panel (always visible)', () => {
+  it('displays the chat panel (always visible)', async () => {
     render(<ForensicDashboard />)
-    expect(screen.getByTestId('chat-mock')).toBeInTheDocument()
+    // Chat is lazy-loaded, wait for Suspense to resolve
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-mock')).toBeInTheDocument()
+    })
   })
 
-  it('has split layout with table on left and chat on right', () => {
+  it('has split layout with table on left and chat on right', async () => {
     render(<ForensicDashboard />)
     const dashboard = screen.getByTestId('forensic-dashboard')
     // Check for grid/flex layout classes
     expect(dashboard.querySelector('[data-testid="flow-table-mock"]')).toBeInTheDocument()
-    expect(dashboard.querySelector('[data-testid="chat-mock"]')).toBeInTheDocument()
+    // Chat is lazy-loaded, wait for Suspense to resolve
+    await waitFor(() => {
+      expect(dashboard.querySelector('[data-testid="chat-mock"]')).toBeInTheDocument()
+    })
   })
 
   it('shows app title in header', () => {
@@ -87,7 +93,7 @@ describe('ForensicDashboard', () => {
     expect(screen.getByText('nfchat')).toBeInTheDocument()
   })
 
-  it('wires up click-to-filter to chat', () => {
+  it('wires up click-to-filter to chat', async () => {
     // Setup store with test data
     useStore.setState({
       flows: [
@@ -107,7 +113,10 @@ describe('ForensicDashboard', () => {
     // The test is checking that the wiring exists - actual click-to-filter
     // is tested in FlowTable tests. Here we just verify both components render.
     expect(screen.getByTestId('flow-table-mock')).toBeInTheDocument()
-    expect(screen.getByTestId('chat-mock')).toBeInTheDocument()
+    // Chat is lazy-loaded, wait for Suspense to resolve
+    await waitFor(() => {
+      expect(screen.getByTestId('chat-mock')).toBeInTheDocument()
+    })
   })
 
   describe('server-side column filtering', () => {

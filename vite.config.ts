@@ -17,6 +17,9 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   build: {
     outDir: 'dist',
+    // Increase warning limit for lazy-loaded chunks that include DuckDB WASM
+    // Main chunk is under 500KB, lazy chunks are intentionally larger
+    chunkSizeWarningLimit: 300,
   },
   resolve: {
     alias: {

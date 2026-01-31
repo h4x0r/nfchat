@@ -1,11 +1,15 @@
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
 import { useNetflowData } from '@/hooks/useNetflowData'
-import { ForensicDashboard } from '@/components/forensic/ForensicDashboard'
 import { LandingPage, type CRTLogEntry } from '@/components/landing/LandingPage'
 import { CRTLoadingLog } from '@/components/landing/CRTLoadingLog'
 import { ErrorBoundary } from '@/components/error'
 import { logger } from '@/lib/logger'
 import '@/styles/crt.css'
+
+// Lazy load the dashboard - it pulls in heavy dependencies (react-table, react-markdown, etc.)
+const ForensicDashboard = lazy(() =>
+  import('@/components/forensic/ForensicDashboard').then(m => ({ default: m.ForensicDashboard }))
+)
 
 const appLogger = logger.child('App')
 
@@ -15,6 +19,25 @@ type DataSource =
   | { type: 'none' }
   | { type: 'url'; url: string; fileName: string }
   | { type: 'file'; file: File }
+
+/**
+ * Suspense fallback while dashboard chunk loads.
+ * Keeps CRT theme for visual consistency.
+ */
+function DashboardLoadingFallback() {
+  return (
+    <div className="crt-container crt-scanlines min-h-screen flex flex-col items-center justify-center p-8">
+      <div className="w-full max-w-xl space-y-8 text-center">
+        <div className="crt-glow text-lg">
+          &gt; Loading dashboard...
+        </div>
+        <div className="crt-glow-dim text-xs">
+          Security Ronin • NetFlow Analysis
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function App() {
   const [dataSource, setDataSource] = useState<DataSource>({ type: 'none' })
@@ -160,7 +183,9 @@ function App() {
       context="Dashboard"
       onError={(error) => appLogger.error('Dashboard error', { error: error.message })}
     >
-      <ForensicDashboard />
+      <Suspense fallback={<DashboardLoadingFallback />}>
+        <ForensicDashboard />
+      </Suspense>
     </ErrorBoundary>
   )
 }
