@@ -33,13 +33,20 @@ vi.mock('./StatsBar', () => ({
   StatsBar: () => <div data-testid="stats-bar-mock">StatsBar</div>,
 }))
 
+// Track KillChainTimeline props for testing
+let capturedKillChainProps: Record<string, unknown> = {}
+
 vi.mock('./KillChainTimeline', () => ({
-  KillChainTimeline: () => <div data-testid="kill-chain-mock">KillChainTimeline</div>,
+  KillChainTimeline: (props: Record<string, unknown>) => {
+    capturedKillChainProps = props
+    return <div data-testid="kill-chain-mock">KillChainTimeline</div>
+  },
 }))
 
 describe('ForensicDashboard', () => {
   beforeEach(() => {
     capturedFlowTableProps = {}
+    capturedKillChainProps = {}
     mockGetFlows.mockClear()
     mockGetFlows.mockResolvedValue({ flows: [], totalCount: 0 })
     useStore.setState({
@@ -252,6 +259,56 @@ describe('ForensicDashboard', () => {
         const whereClause = lastCall[0]?.whereClause as string
         expect(whereClause).toContain("Attack != 'Benign'")
         expect(whereClause).toContain("Attack IN ('DoS')")
+      })
+    })
+  })
+
+  describe('kill chain session selection', () => {
+    it('filters flows immediately when a session is selected', async () => {
+      render(<ForensicDashboard />)
+
+      // Toggle kill chain view
+      await act(async () => {
+        const killChainButton = screen.getByText(/Kill Chain/)
+        killChainButton.click()
+      })
+
+      await waitFor(() => {
+        expect(capturedKillChainProps.onSessionSelect).toBeDefined()
+      })
+
+      // Clear previous calls
+      mockGetFlows.mockClear()
+
+      // Simulate session selection
+      const mockSession = {
+        session_id: '143.88.12.12-12345',
+        src_ip: '143.88.12.12',
+        start_time: 1711612000000, // Mar 28, 2024
+        end_time: 1711612060000,
+        duration_minutes: 1,
+        flow_count: 4,
+        tactics: ['Initial Access', 'Execution'],
+        techniques: ['T1190', 'T1059'],
+        target_ips: ['10.0.0.1'],
+        target_ports: [80],
+        total_bytes: 1000,
+      }
+
+      await act(async () => {
+        const onSessionSelect = capturedKillChainProps.onSessionSelect as (session: typeof mockSession) => void
+        onSessionSelect(mockSession)
+      })
+
+      // Should call getFlows with src_ip and time range filter
+      await waitFor(() => {
+        const calls = mockGetFlows.mock.calls
+        expect(calls.length).toBeGreaterThan(0)
+        const lastCall = calls[calls.length - 1]
+        const whereClause = lastCall[0]?.whereClause as string
+        expect(whereClause).toContain("IPV4_SRC_ADDR = '143.88.12.12'")
+        expect(whereClause).toContain('FLOW_START_MILLISECONDS >=')
+        expect(whereClause).toContain('FLOW_END_MILLISECONDS <=')
       })
     })
   })

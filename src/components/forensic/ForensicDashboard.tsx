@@ -82,7 +82,7 @@ export function ForensicDashboard() {
 
   // Kill Chain Timeline panel state
   const [showKillChain, setShowKillChain] = useState(false)
-  const [_selectedSession, setSelectedSession] = useState<AttackSession | null>(null)
+  const [selectedSession, setSelectedSession] = useState<AttackSession | null>(null)
 
   // Store state - primitive selectors are already optimal (no object comparison needed)
   const hideBenign = useStore((s) => s.hideBenign)
@@ -101,7 +101,7 @@ export function ForensicDashboard() {
   // Calculate total pages from filtered count
   const displayedTotalPages = Math.ceil(filteredTotalCount / pageSize) || 1
 
-  // Server-side filter and paginate - reload when hideBenign, columnFilters, page, or pageSize changes
+  // Server-side filter and paginate - reload when hideBenign, columnFilters, selectedSession, page, or pageSize changes
   // Uses lightweight getFlows endpoint (only 2 queries vs 6 in getDashboardData)
   useEffect(() => {
     let cancelled = false
@@ -110,7 +110,7 @@ export function ForensicDashboard() {
       setPageLoading(true)
       setPageError(null)
       try {
-        // Build combined WHERE clause from hideBenign + column filters
+        // Build combined WHERE clause from hideBenign + column filters + session filter
         const conditions: string[] = []
         if (hideBenign) {
           conditions.push("Attack != 'Benign'")
@@ -118,6 +118,14 @@ export function ForensicDashboard() {
         const columnFilterSQL = buildColumnFilterSQL(columnFilters)
         if (columnFilterSQL) {
           conditions.push(columnFilterSQL)
+        }
+        // Add session filter if a kill chain session is selected
+        if (selectedSession) {
+          const builder = new WhereClauseBuilder()
+          builder.addCondition('IPV4_SRC_ADDR', '=', selectedSession.src_ip)
+          builder.addCondition('FLOW_START_MILLISECONDS', '>=', selectedSession.start_time)
+          builder.addCondition('FLOW_END_MILLISECONDS', '<=', selectedSession.end_time)
+          conditions.push(builder.build())
         }
         const whereClause = conditions.length > 0 ? conditions.join(' AND ') : '1=1'
 
@@ -154,7 +162,7 @@ export function ForensicDashboard() {
     return () => {
       cancelled = true
     }
-  }, [hideBenign, columnFilters, currentPage, pageSize])
+  }, [hideBenign, columnFilters, selectedSession, currentPage, pageSize])
 
   // Track previous hideBenign to detect changes (not initial mount)
   const prevHideBenignRef = useRef(hideBenign)
@@ -229,6 +237,18 @@ export function ForensicDashboard() {
     [processChat]
   )
 
+  // Handle kill chain session selection - immediately filter flows
+  const handleSessionSelect = useCallback(
+    (session: AttackSession) => {
+      setSelectedSession(session)
+      // Reset to page 0 when session filter changes
+      if (currentPage !== 0) {
+        setCurrentPage(0)
+      }
+    },
+    [currentPage, setCurrentPage]
+  )
+
   return (
     <div
       data-testid="forensic-dashboard"
@@ -278,12 +298,7 @@ export function ForensicDashboard() {
           <Suspense fallback={<PanelLoadingFallback />}>
             {showKillChain ? (
               <KillChainTimeline
-                onSessionSelect={(session) => {
-                  setSelectedSession(session)
-                  // Optionally filter flows to this session
-                  const query = `Show flows from ${session.src_ip} between ${new Date(session.start_time).toISOString()} and ${new Date(session.end_time).toISOString()}`
-                  processChat(query)
-                }}
+                onSessionSelect={handleSessionSelect}
                 className="h-full"
               />
             ) : (
