@@ -199,4 +199,75 @@ describe('API Client', () => {
       )
     })
   })
+
+  describe('Request deduplication', () => {
+    it('deduplicates concurrent identical requests', async () => {
+      // Use a Promise that we control to ensure requests are truly concurrent
+      let resolveJson: (value: unknown) => void
+      const jsonPromise = new Promise((resolve) => {
+        resolveJson = resolve
+      })
+
+      mockFetch.mockImplementation(() =>
+        Promise.resolve({
+          ok: true,
+          json: () => jsonPromise,
+        })
+      )
+
+      const { getFlows } = await import('./api-client')
+
+      // Start two identical requests concurrently
+      const request1 = getFlows({ whereClause: '1=1', limit: 50, offset: 0 })
+      const request2 = getFlows({ whereClause: '1=1', limit: 50, offset: 0 })
+
+      // Resolve the fetch
+      resolveJson!({ success: true, data: { flows: [], totalCount: 0 } })
+
+      // Both should resolve successfully
+      const [result1, result2] = await Promise.all([request1, request2])
+
+      // Fetch should only be called once due to deduplication
+      expect(mockFetch).toHaveBeenCalledTimes(1)
+
+      // Both results should be identical
+      expect(result1).toEqual(result2)
+    })
+
+    it('does not deduplicate requests with different parameters', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, data: { flows: [], totalCount: 0 } }),
+      })
+
+      const { getFlows } = await import('./api-client')
+
+      // Start two requests with different parameters
+      const request1 = getFlows({ whereClause: '1=1', limit: 50, offset: 0 })
+      const request2 = getFlows({ whereClause: '1=1', limit: 50, offset: 50 })
+
+      await Promise.all([request1, request2])
+
+      // Both should trigger separate fetch calls
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+
+    it('allows new request after previous one completes', async () => {
+      mockFetch.mockResolvedValue({
+        ok: true,
+        json: async () => ({ success: true, data: { flows: [], totalCount: 0 } }),
+      })
+
+      const { getFlows } = await import('./api-client')
+
+      // First request
+      await getFlows({ whereClause: '1=1', limit: 50, offset: 0 })
+
+      // Second identical request after first completes
+      await getFlows({ whereClause: '1=1', limit: 50, offset: 0 })
+
+      // Both should trigger separate fetch calls since first completed
+      expect(mockFetch).toHaveBeenCalledTimes(2)
+    })
+  })
 })

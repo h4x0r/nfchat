@@ -126,6 +126,23 @@ function parseError(error: unknown, status: number, correlationId: string): AppE
 }
 
 // ─────────────────────────────────────────────────────────────
+// Request Deduplication
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Cache of in-flight requests to prevent duplicate concurrent calls.
+ * Key: endpoint + JSON body, Value: Promise of result
+ */
+const inFlightRequests = new Map<string, Promise<unknown>>()
+
+/**
+ * Create a unique key for request deduplication.
+ */
+function createRequestKey(endpoint: string, body: Record<string, unknown>): string {
+  return `${endpoint}:${JSON.stringify(body)}`
+}
+
+// ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
 
@@ -134,47 +151,66 @@ async function apiPost<T>(
   body: Record<string, unknown>,
   trace?: TraceContext
 ): Promise<T> {
+  // Check for duplicate in-flight request
+  const requestKey = createRequestKey(endpoint, body)
+  const existingRequest = inFlightRequests.get(requestKey)
+  if (existingRequest) {
+    apiLogger.debug('Deduplicating request', { endpoint })
+    return existingRequest as Promise<T>
+  }
+
   const ctx = trace ?? createTraceContext(`POST:${endpoint}`)
 
   apiLogger.debug('Request', { requestId: ctx.requestId, endpoint })
 
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Request-ID': ctx.requestId,
-      },
-      body: JSON.stringify(body),
-    })
+  // Create the request promise
+  const requestPromise = (async () => {
+    try {
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Request-ID': ctx.requestId,
+        },
+        body: JSON.stringify(body),
+      })
 
-    const data = await response.json()
-    const elapsed = performance.now() - ctx.startTime
+      const data = await response.json()
+      const elapsed = performance.now() - ctx.startTime
 
-    apiLogger.debug('Response', {
-      requestId: ctx.requestId,
-      status: response.status,
-      ms: Math.round(elapsed),
-    })
+      apiLogger.debug('Response', {
+        requestId: ctx.requestId,
+        status: response.status,
+        ms: Math.round(elapsed),
+      })
 
-    if (!response.ok || !data.success) {
-      throw new ApiError(parseError(data.error, response.status, ctx.requestId))
+      if (!response.ok || !data.success) {
+        throw new ApiError(parseError(data.error, response.status, ctx.requestId))
+      }
+
+      return data as T
+    } catch (err) {
+      // Re-throw ApiError as-is
+      if (err instanceof ApiError) {
+        throw err
+      }
+
+      // Wrap network errors
+      const networkError = Errors.network(
+        err instanceof Error ? err.message : 'Network request failed',
+        { correlationId: ctx.requestId }
+      )
+      throw new ApiError(networkError)
+    } finally {
+      // Clean up in-flight cache after request completes
+      inFlightRequests.delete(requestKey)
     }
+  })()
 
-    return data
-  } catch (err) {
-    // Re-throw ApiError as-is
-    if (err instanceof ApiError) {
-      throw err
-    }
+  // Cache the in-flight request
+  inFlightRequests.set(requestKey, requestPromise)
 
-    // Wrap network errors
-    const networkError = Errors.network(
-      err instanceof Error ? err.message : 'Network request failed',
-      { correlationId: ctx.requestId }
-    )
-    throw new ApiError(networkError)
-  }
+  return requestPromise
 }
 
 // ─────────────────────────────────────────────────────────────

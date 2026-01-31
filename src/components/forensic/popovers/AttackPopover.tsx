@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import {
   Popover,
   PopoverContent,
@@ -13,7 +14,20 @@ interface AttackPopoverProps {
 }
 
 export function AttackPopover({ data, onFilter }: AttackPopoverProps) {
-  if (data.length === 0) {
+  // Memoize expensive computations - only recalculate when data changes
+  const { total, topAttack, topPercent, sortedData } = useMemo(() => {
+    if (data.length === 0) {
+      return { total: 0, topAttack: null, topPercent: 0, sortedData: [] }
+    }
+    const t = data.reduce((sum, d) => sum + d.count, 0)
+    const top = data.reduce((a, b) => (a.count > b.count ? a : b))
+    const pct = t > 0 ? Math.round((top.count / t) * 100) : 0
+    // Sort once, not on every render
+    const sorted = [...data].sort((a, b) => b.count - a.count)
+    return { total: t, topAttack: top, topPercent: pct, sortedData: sorted }
+  }, [data])
+
+  if (data.length === 0 || !topAttack) {
     return (
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>🎯</span>
@@ -21,11 +35,6 @@ export function AttackPopover({ data, onFilter }: AttackPopoverProps) {
       </div>
     )
   }
-
-  // Calculate total and find top attack
-  const total = data.reduce((sum, d) => sum + d.count, 0)
-  const topAttack = data.reduce((a, b) => (a.count > b.count ? a : b))
-  const topPercent = total > 0 ? Math.round((topAttack.count / total) * 100) : 0
 
   return (
     <Popover>
@@ -45,9 +54,7 @@ export function AttackPopover({ data, onFilter }: AttackPopoverProps) {
         <div className="space-y-3">
           <h4 className="font-medium text-sm">Attack Breakdown</h4>
           <div className="space-y-2">
-            {data
-              .sort((a, b) => b.count - a.count)
-              .map((item) => {
+            {sortedData.map((item) => {
                 const percent = total > 0 ? Math.round((item.count / total) * 100) : 0
                 const color = ATTACK_COLORS[item.attack as AttackType] || '#6b7280'
 

@@ -119,6 +119,52 @@ describe('ForensicDashboard', () => {
     })
   })
 
+  describe('callback stability', () => {
+    it('maintains stable onCellClick reference across re-renders', async () => {
+      render(<ForensicDashboard />)
+
+      await waitFor(() => {
+        expect(capturedFlowTableProps.onCellClick).toBeDefined()
+      })
+
+      // Capture first callback reference
+      const firstCallback = capturedFlowTableProps.onCellClick
+
+      // Trigger a state update that causes re-render
+      await act(async () => {
+        useStore.setState({ messages: [{ id: '1', role: 'user', content: 'test', timestamp: new Date() }] })
+      })
+
+      // Wait for re-render
+      await waitFor(() => {
+        expect(capturedFlowTableProps.onCellClick).toBeDefined()
+      })
+
+      // Callback reference should be stable (same function)
+      expect(capturedFlowTableProps.onCellClick).toBe(firstCallback)
+    })
+
+    it('maintains stable onColumnFiltersChange reference across re-renders', async () => {
+      render(<ForensicDashboard />)
+
+      await waitFor(() => {
+        expect(capturedFlowTableProps.onColumnFiltersChange).toBeDefined()
+      })
+
+      const firstCallback = capturedFlowTableProps.onColumnFiltersChange
+
+      await act(async () => {
+        useStore.setState({ messages: [{ id: '1', role: 'user', content: 'test', timestamp: new Date() }] })
+      })
+
+      await waitFor(() => {
+        expect(capturedFlowTableProps.onColumnFiltersChange).toBeDefined()
+      })
+
+      expect(capturedFlowTableProps.onColumnFiltersChange).toBe(firstCallback)
+    })
+  })
+
   describe('server-side column filtering', () => {
     it('passes columnFilters and onColumnFiltersChange to FlowTable', async () => {
       render(<ForensicDashboard />)

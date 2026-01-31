@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { buildWhereClause, selectFilteredFlows } from './selectors';
-import type { FilterState, AppState } from './types';
+import { buildWhereClause, selectFilteredFlows, selectDashboardState, selectChatState } from './selectors';
+import type { FilterState, AppState, ChatMessage } from './types';
 
 describe('buildWhereClause', () => {
   const emptyFilters: FilterState = {
@@ -110,5 +110,145 @@ describe('selectFilteredFlows', () => {
     }));
     const state = { ...baseState, flows, hideBenign: false };
     expect(selectFilteredFlows(state)).toHaveLength(10000);
+  });
+});
+
+describe('selectDashboardState', () => {
+  const createMockState = (overrides: Partial<AppState> = {}): AppState => ({
+    // FilterSlice
+    timeRange: { start: null, end: null },
+    srcIps: [],
+    dstIps: [],
+    srcPorts: [],
+    dstPorts: [],
+    protocols: [],
+    l7Protocols: [],
+    attackTypes: [],
+    customFilter: null,
+    resultCount: null,
+    setTimeRange: () => {},
+    addSrcIp: () => {},
+    removeSrcIp: () => {},
+    addDstIp: () => {},
+    removeDstIp: () => {},
+    setAttackTypes: () => {},
+    toggleAttackType: () => {},
+    setCustomFilter: () => {},
+    setResultCount: () => {},
+    clearFilters: () => {},
+    // PaginationSlice
+    currentPage: 0,
+    pageSize: 100,
+    setCurrentPage: () => {},
+    setPageSize: () => {},
+    nextPage: () => {},
+    prevPage: () => {},
+    totalPages: () => 1,
+    pageOffset: () => 0,
+    // ChatSlice
+    messages: [],
+    isLoading: false,
+    addMessage: () => {},
+    setIsLoading: () => {},
+    clearChat: () => {},
+    // DataSlice
+    dataLoaded: false,
+    dataLoading: false,
+    dataError: null,
+    totalRows: 0,
+    attackBreakdown: [],
+    topSrcIPs: [],
+    topDstIPs: [],
+    flows: [],
+    totalFlowCount: 0,
+    selectedFlow: null,
+    setDataLoaded: () => {},
+    setDataLoading: () => {},
+    setDataError: () => {},
+    setTotalRows: () => {},
+    setAttackBreakdown: () => {},
+    setTopSrcIPs: () => {},
+    setTopDstIPs: () => {},
+    setFlows: () => {},
+    setTotalFlowCount: () => {},
+    setSelectedFlow: () => {},
+    // UISlice
+    hideBenign: false,
+    filteredFlows: [],
+    toggleHideBenign: () => {},
+    ...overrides,
+  } as AppState);
+
+  it('extracts hideBenign from state', () => {
+    const state = createMockState({ hideBenign: true });
+    const result = selectDashboardState(state);
+    expect(result.hideBenign).toBe(true);
+  });
+
+  it('extracts currentPage from state', () => {
+    const state = createMockState({ currentPage: 5 });
+    const result = selectDashboardState(state);
+    expect(result.currentPage).toBe(5);
+  });
+
+  it('returns same object reference for identical state', () => {
+    const state = createMockState();
+    const result1 = selectDashboardState(state);
+    const result2 = selectDashboardState(state);
+    // Selector should return structurally equal objects
+    expect(result1).toEqual(result2);
+  });
+
+  it('extracts all dashboard-relevant fields', () => {
+    const state = createMockState({
+      hideBenign: true,
+      currentPage: 3,
+    });
+    const result = selectDashboardState(state);
+    expect(result).toHaveProperty('hideBenign', true);
+    expect(result).toHaveProperty('currentPage', 3);
+  });
+});
+
+describe('selectChatState', () => {
+  const createMockState = (overrides: Partial<AppState> = {}): AppState => ({
+    // Minimal mock - only chat-related fields needed for this selector
+    messages: [],
+    isLoading: false,
+    addMessage: () => {},
+    setIsLoading: () => {},
+    clearChat: () => {},
+    // Other slices (minimal)
+    hideBenign: false,
+    currentPage: 0,
+    pageSize: 100,
+    // Apply overrides LAST to ensure they take effect
+    ...overrides,
+  } as unknown as AppState);
+
+  it('extracts messages from state', () => {
+    const messages: ChatMessage[] = [
+      { id: '1', role: 'user', content: 'Hello', timestamp: new Date() },
+    ];
+    const state = createMockState({ messages } as Partial<AppState>);
+    const result = selectChatState(state);
+    expect(result.messages).toEqual(messages);
+  });
+
+  it('extracts isLoading from state', () => {
+    const state = createMockState({ isLoading: true } as Partial<AppState>);
+    const result = selectChatState(state);
+    expect(result.isLoading).toBe(true);
+  });
+
+  it('returns chat-specific fields only', () => {
+    const state = createMockState({
+      messages: [{ id: '1', role: 'user', content: 'Test', timestamp: new Date() }],
+      isLoading: true,
+    } as Partial<AppState>);
+    const result = selectChatState(state);
+    expect(result).toHaveProperty('messages');
+    expect(result).toHaveProperty('isLoading');
+    expect(Object.keys(result)).toHaveLength(2);
   });
 });

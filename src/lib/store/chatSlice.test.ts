@@ -89,4 +89,35 @@ describe('chatSlice', () => {
       expect(store.getState().messages).toEqual([]);
     });
   });
+
+  describe('message windowing', () => {
+    it('keeps only the most recent 100 messages', () => {
+      // Add 105 messages
+      for (let i = 0; i < 105; i++) {
+        store.getState().addMessage({ role: 'user', content: `Message ${i}` });
+      }
+
+      const messages = store.getState().messages;
+
+      // Should only have 100 messages (windowed)
+      expect(messages).toHaveLength(100);
+
+      // Should keep the most recent messages (5-104, not 0-99)
+      expect(messages[0].content).toBe('Message 5');
+      expect(messages[99].content).toBe('Message 104');
+    });
+
+    it('does not trim messages when under the limit', () => {
+      // Add 50 messages
+      for (let i = 0; i < 50; i++) {
+        store.getState().addMessage({ role: 'user', content: `Message ${i}` });
+      }
+
+      const messages = store.getState().messages;
+
+      // Should keep all 50 messages
+      expect(messages).toHaveLength(50);
+      expect(messages[0].content).toBe('Message 0');
+    });
+  });
 });

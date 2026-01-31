@@ -1,6 +1,34 @@
 import type { FlowRecord } from '../schema';
-import type { FilterState, AppState } from './types';
+import type { FilterState, AppState, ChatMessage } from './types';
 import { WhereClauseBuilder } from '../sql';
+
+/**
+ * Dashboard state selector - combines multiple state slices into a single object.
+ * Using a composite selector reduces re-renders by allowing shallow equality checks.
+ */
+export interface DashboardState {
+  hideBenign: boolean;
+  currentPage: number;
+}
+
+export const selectDashboardState = (state: AppState): DashboardState => ({
+  hideBenign: state.hideBenign,
+  currentPage: state.currentPage,
+});
+
+/**
+ * Chat state selector - extracts chat-specific fields.
+ * Allows components to subscribe only to chat state changes.
+ */
+export interface ChatState {
+  messages: ChatMessage[];
+  isLoading: boolean;
+}
+
+export const selectChatState = (state: AppState): ChatState => ({
+  messages: state.messages,
+  isLoading: state.isLoading,
+});
 
 // Limit to 10K rows for performance - filtering millions client-side is too slow
 const MAX_DISPLAY_ROWS = 10000;

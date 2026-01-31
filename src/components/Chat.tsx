@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, memo } from 'react'
 import { Send, X, Loader2 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import { Button } from '@/components/ui/button'
@@ -101,7 +101,11 @@ interface MessageBubbleProps {
   onPivot?: (query: string) => void
 }
 
-function MessageBubble({ message, onPivot }: MessageBubbleProps) {
+/**
+ * Memoized message bubble - prevents re-rendering when Chat input state changes.
+ * Important because ReactMarkdown is expensive to render.
+ */
+const MessageBubble = memo(function MessageBubble({ message, onPivot }: MessageBubbleProps) {
   const isUser = message.role === 'user'
 
   return (
@@ -140,4 +144,4 @@ function MessageBubble({ message, onPivot }: MessageBubbleProps) {
       </div>
     </div>
   )
-}
+})

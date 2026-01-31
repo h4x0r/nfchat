@@ -84,17 +84,19 @@ export function ForensicDashboard() {
   const [showKillChain, setShowKillChain] = useState(false)
   const [_selectedSession, setSelectedSession] = useState<AttackSession | null>(null)
 
-  // Store state
+  // Store state - primitive selectors are already optimal (no object comparison needed)
   const hideBenign = useStore((s) => s.hideBenign)
+  const currentPage = useStore((s) => s.currentPage)
   const messages = useStore((s) => s.messages)
   const isLoading = useStore((s) => s.isLoading)
+
+  // Store actions - individual selectors for stable references
   const addMessage = useStore((s) => s.addMessage)
   const setIsLoading = useStore((s) => s.setIsLoading)
+  const setCurrentPage = useStore((s) => s.setCurrentPage)
 
   // Pagination state (use dynamic page size)
-  const currentPage = useStore((s) => s.currentPage)
   const pageSize = dynamicPageSize
-  const setCurrentPage = useStore((s) => s.setCurrentPage)
 
   // Calculate total pages from filtered count
   const displayedTotalPages = Math.ceil(filteredTotalCount / pageSize) || 1

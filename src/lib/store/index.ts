@@ -4,7 +4,7 @@ import { createPaginationSlice } from './paginationSlice';
 import { createChatSlice } from './chatSlice';
 import { createDataSlice } from './dataSlice';
 import { createUISlice } from './uiSlice';
-import { buildWhereClause, selectFilteredFlows } from './selectors';
+import { buildWhereClause, selectFilteredFlows, selectDashboardState, selectChatState } from './selectors';
 import type { AppState } from './types';
 
 // Re-export types for backwards compatibility
@@ -17,7 +17,8 @@ export type {
 } from './types';
 
 // Re-export selectors
-export { buildWhereClause, selectFilteredFlows };
+export { buildWhereClause, selectFilteredFlows, selectDashboardState, selectChatState };
+export type { DashboardState, ChatState } from './selectors';
 
 // Re-export initial state for tests
 export { initialFilterState };

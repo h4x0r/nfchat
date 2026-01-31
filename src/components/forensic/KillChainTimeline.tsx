@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, memo, useMemo } from 'react'
 import { getAttackSessions, getKillChainPhases } from '@/lib/motherduck/queries'
 import type { AttackSession, KillChainPhase } from '@/lib/motherduck/types'
 import { ATTACK_COLORS, MITRE_TECHNIQUES } from '@/lib/schema'
@@ -21,10 +21,103 @@ const KILL_CHAIN_ORDER = [
   'Impact',
 ]
 
+// Pure utility functions - moved outside component to avoid recreation
+function formatTime(ms: number): string {
+  return new Date(ms).toLocaleString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
+function getTacticPosition(tactic: string): number {
+  const idx = KILL_CHAIN_ORDER.indexOf(tactic)
+  return idx >= 0 ? idx : KILL_CHAIN_ORDER.length
+}
+
+function sortTactics(tactics: string[]): string[] {
+  return [...tactics].sort((a, b) => getTacticPosition(a) - getTacticPosition(b))
+}
+
 interface KillChainTimelineProps {
   onSessionSelect?: (session: AttackSession) => void
   className?: string
 }
+
+interface SessionItemProps {
+  session: AttackSession
+  isSelected: boolean
+  onClick: (session: AttackSession) => void
+}
+
+/**
+ * Memoized session item - only re-renders when session data or selection changes.
+ */
+const SessionItem = memo(function SessionItem({
+  session,
+  isSelected,
+  onClick,
+}: SessionItemProps) {
+  // Memoize sorted tactics to avoid re-sorting on every render
+  const sortedTactics = useMemo(
+    () => sortTactics(session.tactics || []),
+    [session.tactics]
+  )
+
+  return (
+    <div
+      className={cn(
+        'p-3 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors',
+        isSelected && 'bg-muted'
+      )}
+      onClick={() => onClick(session)}
+    >
+      {/* Session Header */}
+      <div className="flex items-center justify-between mb-2">
+        <div className="font-mono text-sm">{session.src_ip}</div>
+        <div className="text-xs text-muted-foreground">
+          {session.flow_count} flows &middot; {Math.round(session.duration_minutes)}m
+        </div>
+      </div>
+
+      {/* Time Range */}
+      <div className="text-xs text-muted-foreground mb-2">
+        {formatTime(session.start_time)} → {formatTime(session.end_time)}
+      </div>
+
+      {/* Tactic Pills (Kill Chain Order) */}
+      <div className="flex flex-wrap gap-1">
+        {sortedTactics.map((tactic) => (
+          <span
+            key={tactic}
+            className="px-2 py-0.5 rounded text-xs text-white/90"
+            style={{ backgroundColor: ATTACK_COLORS[tactic] || '#71717a' }}
+          >
+            {tactic}
+          </span>
+        ))}
+      </div>
+
+      {/* Technique IDs */}
+      {(session.techniques?.length ?? 0) > 0 && (
+        <div className="mt-1 text-xs text-muted-foreground">
+          {(session.techniques || []).map((t) => (
+            <span key={t} className="mr-2" title={MITRE_TECHNIQUES[t]?.name || t}>
+              {t}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Target Summary */}
+      <div className="mt-1 text-xs text-muted-foreground">
+        → {(session.target_ips || []).slice(0, 3).join(', ')}
+        {(session.target_ips?.length ?? 0) > 3 && ` +${session.target_ips.length - 3} more`}
+      </div>
+    </div>
+  )
+})
 
 /**
  * Kill Chain Timeline - visualizes attack sessions with MITRE ATT&CK tactic progression.
@@ -69,27 +162,6 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
       setPhases([])
     }
   }, [onSessionSelect])
-
-  // Format timestamp
-  const formatTime = (ms: number) => {
-    return new Date(ms).toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-    })
-  }
-
-  // Get tactic position in kill chain (0-12)
-  const getTacticPosition = (tactic: string) => {
-    const idx = KILL_CHAIN_ORDER.indexOf(tactic)
-    return idx >= 0 ? idx : KILL_CHAIN_ORDER.length
-  }
-
-  // Sort tactics by kill chain order
-  const sortTactics = (tactics: string[]) => {
-    return [...tactics].sort((a, b) => getTacticPosition(a) - getTacticPosition(b))
-  }
 
   if (loading) {
     return (
@@ -147,57 +219,12 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
       {/* Sessions List */}
       <div className="flex-1 overflow-y-auto">
         {sessions.map((session) => (
-          <div
+          <SessionItem
             key={session.session_id}
-            className={cn(
-              'p-3 border-b border-border cursor-pointer hover:bg-muted/50 transition-colors',
-              selectedSession?.session_id === session.session_id && 'bg-muted'
-            )}
-            onClick={() => handleSessionClick(session)}
-          >
-            {/* Session Header */}
-            <div className="flex items-center justify-between mb-2">
-              <div className="font-mono text-sm">{session.src_ip}</div>
-              <div className="text-xs text-muted-foreground">
-                {session.flow_count} flows &middot; {Math.round(session.duration_minutes)}m
-              </div>
-            </div>
-
-            {/* Time Range */}
-            <div className="text-xs text-muted-foreground mb-2">
-              {formatTime(session.start_time)} → {formatTime(session.end_time)}
-            </div>
-
-            {/* Tactic Pills (Kill Chain Order) */}
-            <div className="flex flex-wrap gap-1">
-              {sortTactics(session.tactics || []).map((tactic) => (
-                <span
-                  key={tactic}
-                  className="px-2 py-0.5 rounded text-xs text-white/90"
-                  style={{ backgroundColor: ATTACK_COLORS[tactic] || '#71717a' }}
-                >
-                  {tactic}
-                </span>
-              ))}
-            </div>
-
-            {/* Technique IDs */}
-            {(session.techniques?.length ?? 0) > 0 && (
-              <div className="mt-1 text-xs text-muted-foreground">
-                {(session.techniques || []).map((t) => (
-                  <span key={t} className="mr-2" title={MITRE_TECHNIQUES[t]?.name || t}>
-                    {t}
-                  </span>
-                ))}
-              </div>
-            )}
-
-            {/* Target Summary */}
-            <div className="mt-1 text-xs text-muted-foreground">
-              → {(session.target_ips || []).slice(0, 3).join(', ')}
-              {(session.target_ips?.length ?? 0) > 3 && ` +${session.target_ips.length - 3} more`}
-            </div>
-          </div>
+            session={session}
+            isSelected={selectedSession?.session_id === session.session_id}
+            onClick={handleSessionClick}
+          />
         ))}
       </div>
 
