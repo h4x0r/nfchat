@@ -170,7 +170,7 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
 
             {/* Tactic Pills (Kill Chain Order) */}
             <div className="flex flex-wrap gap-1">
-              {sortTactics(session.tactics).map((tactic) => (
+              {sortTactics(session.tactics || []).map((tactic) => (
                 <span
                   key={tactic}
                   className="px-2 py-0.5 rounded text-xs text-white/90"
@@ -182,9 +182,9 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
             </div>
 
             {/* Technique IDs */}
-            {session.techniques.length > 0 && (
+            {(session.techniques?.length ?? 0) > 0 && (
               <div className="mt-1 text-xs text-muted-foreground">
-                {session.techniques.map((t) => (
+                {(session.techniques || []).map((t) => (
                   <span key={t} className="mr-2" title={MITRE_TECHNIQUES[t]?.name || t}>
                     {t}
                   </span>
@@ -194,8 +194,8 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
 
             {/* Target Summary */}
             <div className="mt-1 text-xs text-muted-foreground">
-              → {session.target_ips.slice(0, 3).join(', ')}
-              {session.target_ips.length > 3 && ` +${session.target_ips.length - 3} more`}
+              → {(session.target_ips || []).slice(0, 3).join(', ')}
+              {(session.target_ips?.length ?? 0) > 3 && ` +${session.target_ips.length - 3} more`}
             </div>
           </div>
         ))}
@@ -240,8 +240,8 @@ export function KillChainTimeline({ onSessionSelect, className }: KillChainTimel
                   </div>
                   <div className="text-muted-foreground mt-0.5">
                     {phase.flow_count} flows →{' '}
-                    {phase.target_ips.slice(0, 2).join(', ')}
-                    {phase.target_ips.length > 2 && ` +${phase.target_ips.length - 2}`}
+                    {(phase.target_ips || []).slice(0, 2).join(', ')}
+                    {(phase.target_ips?.length ?? 0) > 2 && ` +${phase.target_ips.length - 2}`}
                   </div>
                 </div>
                 {/* Timing */}
