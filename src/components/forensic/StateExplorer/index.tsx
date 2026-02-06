@@ -9,6 +9,10 @@ import type { StateProfile } from '@/lib/store/types'
 
 const stateExplorerLogger = logger.child('StateExplorer')
 
+const SAMPLE_SIZE = 50_000
+
+const yieldToMain = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
+
 /**
  * State Explorer - discover behavioral states via HMM and assign ATT&CK tactics.
  */
@@ -36,13 +40,14 @@ export function StateExplorer() {
       // Ensure HMM_STATE column exists
       await ensureHmmStateColumn()
 
-      // Extract features from flows
-      const featureRows = await extractFeatures()
+      // Extract features from a random sample of flows
+      const featureRows = await extractFeatures(SAMPLE_SIZE)
       if (featureRows.length < 10) {
         throw new Error('Insufficient data for training (need at least 10 flows)')
       }
 
       setHmmProgress(10)
+      await yieldToMain()
 
       // Convert to feature matrix
       const matrix = featureRows.map((row) => [
@@ -56,6 +61,7 @@ export function StateExplorer() {
       const scaled = scaler.fitTransform(matrix)
 
       setHmmProgress(20)
+      await yieldToMain()
 
       // Determine state count
       let nStates: number
@@ -73,10 +79,12 @@ export function StateExplorer() {
             bestBic = bic
             nStates = k
           }
+          await yieldToMain()
         }
       }
 
       setHmmProgress(40)
+      await yieldToMain()
 
       // Train final model
       const hmm = new GaussianHMM(nStates, 12, { maxIter: 100, seed: 42 })
@@ -87,6 +95,7 @@ export function StateExplorer() {
       })
 
       setHmmProgress(80)
+      await yieldToMain()
 
       // Predict states
       const states = hmm.predict(scaled)

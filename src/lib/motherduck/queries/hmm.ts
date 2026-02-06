@@ -97,9 +97,11 @@ const BATCH_SIZE = 1000;
  * @param limit - Optional row limit for the query
  */
 export async function extractFeatures(
-  limit?: number
+  sampleSize?: number
 ): Promise<FlowFeatureRow[]> {
-  const limitClause = limit !== undefined ? `\n    LIMIT ${Number(limit)}` : '';
+  const sampleClause = sampleSize !== undefined
+    ? `\n    USING SAMPLE ${Number(sampleSize)} ROWS`
+    : '';
 
   return executeQuery<FlowFeatureRow>(`
     SELECT
@@ -116,8 +118,7 @@ export async function extractFeatures(
       CASE WHEN PROTOCOL = 17 THEN 1 ELSE 0 END as is_udp,
       CASE WHEN PROTOCOL = 1 THEN 1 ELSE 0 END as is_icmp,
       CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category
-    FROM flows
-    ORDER BY FLOW_START_MILLISECONDS${limitClause}
+    FROM flows${sampleClause}
   `);
 }
 

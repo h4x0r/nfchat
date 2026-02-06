@@ -63,19 +63,18 @@ describe('HMM Query Module', () => {
       expect(sql).toContain('CASE WHEN PROTOCOL = 1 THEN 1 ELSE 0 END as is_icmp');
       expect(sql).toContain('CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category');
       expect(sql).toContain('rowid');
-      expect(sql).toContain('ORDER BY FLOW_START_MILLISECONDS');
     });
 
-    it('does not include LIMIT when no limit is provided', async () => {
+    it('does not include USING SAMPLE when no sampleSize is provided', async () => {
       await extractFeatures();
       const sql = mockExecuteQuery.mock.calls[0][0];
-      expect(sql).not.toMatch(/LIMIT/i);
+      expect(sql).not.toMatch(/USING SAMPLE/i);
     });
 
-    it('includes LIMIT when limit is provided', async () => {
-      await extractFeatures(500);
+    it('includes USING SAMPLE when sampleSize is provided', async () => {
+      await extractFeatures(50000);
       const sql = mockExecuteQuery.mock.calls[0][0];
-      expect(sql).toContain('LIMIT 500');
+      expect(sql).toContain('USING SAMPLE 50000 ROWS');
     });
 
     it('returns typed FlowFeatureRow results', async () => {
