@@ -17,6 +17,7 @@ import type { FlowRecord } from '../../schema';
 /** Row returned by extractFeatures — 12 engineered features per flow. */
 export interface FlowFeatureRow {
   rowid: number;
+  dst_ip: string;
   log1p_in_bytes: number;
   log1p_out_bytes: number;
   log1p_in_pkts: number;
@@ -113,13 +114,14 @@ const BATCH_SIZE = 1000;
 export async function extractFeatures(
   sampleSize?: number
 ): Promise<FlowFeatureRow[]> {
-  const sampleClause = sampleSize !== undefined
-    ? `\n    USING SAMPLE ${Number(sampleSize)} ROWS`
+  const limitClause = sampleSize !== undefined
+    ? `\n    ORDER BY RANDOM() LIMIT ${Number(sampleSize)}`
     : '';
 
   return executeQuery<FlowFeatureRow>(`
     SELECT
       rowid,
+      IPV4_DST_ADDR as dst_ip,
       LN(1 + IN_BYTES) as log1p_in_bytes,
       LN(1 + OUT_BYTES) as log1p_out_bytes,
       LN(1 + IN_PKTS) as log1p_in_pkts,
@@ -132,7 +134,12 @@ export async function extractFeatures(
       CASE WHEN PROTOCOL = 17 THEN 1 ELSE 0 END as is_udp,
       CASE WHEN PROTOCOL = 1 THEN 1 ELSE 0 END as is_icmp,
       CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category
-    FROM flows${sampleClause}
+    FROM flows
+    WHERE IPV4_DST_ADDR IN (
+      SELECT IPV4_DST_ADDR FROM flows
+      GROUP BY IPV4_DST_ADDR HAVING COUNT(*) >= 3${limitClause}
+    )
+    ORDER BY IPV4_DST_ADDR, FLOW_START_MILLISECONDS
   `);
 }
 

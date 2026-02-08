@@ -45,6 +45,7 @@ describe('discoverStates', () => {
     // Arrange: mock feature extraction
     const mockFeatureRows = Array.from({ length: 100 }, (_, i) => ({
       rowid: i,
+      dst_ip: `10.0.0.${(i % 10) + 1}`,
       log1p_in_bytes: 5.0 + Math.random(),
       log1p_out_bytes: 4.0 + Math.random(),
       log1p_in_pkts: 3.0 + Math.random(),
@@ -198,6 +199,7 @@ describe('discoverStates', () => {
     vi.mocked(extractFeatures).mockResolvedValue([
       {
         rowid: 0,
+        dst_ip: '10.0.0.1',
         log1p_in_bytes: 5.0,
         log1p_out_bytes: 4.0,
         log1p_in_pkts: 3.0,
@@ -213,6 +215,7 @@ describe('discoverStates', () => {
       },
       {
         rowid: 1,
+        dst_ip: '10.0.0.1',
         log1p_in_bytes: 5.1,
         log1p_out_bytes: 4.1,
         log1p_in_pkts: 3.1,
@@ -247,6 +250,7 @@ describe('discoverStates', () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 20 }, (_, i) => ({
       rowid: i,
+      dst_ip: `10.0.0.${(i % 4) + 1}`,
       log1p_in_bytes: 5.0,
       log1p_out_bytes: 4.0,
       log1p_in_pkts: 3.0,
@@ -324,6 +328,7 @@ describe('discoverStates', () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 15 }, (_, i) => ({
       rowid: i,
+      dst_ip: `10.0.0.${(i % 3) + 1}`,
       log1p_in_bytes: 5.0,
       log1p_out_bytes: 4.0,
       log1p_in_pkts: 3.0,
@@ -429,6 +434,7 @@ describe('discoverStates', () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 12 }, (_, i) => ({
       rowid: i,
+      dst_ip: `10.0.0.${(i % 4) + 1}`,
       log1p_in_bytes: 5.0,
       log1p_out_bytes: 4.0,
       log1p_in_pkts: 3.0,
@@ -509,10 +515,69 @@ describe('discoverStates', () => {
     expect(result.profiles[1].suggestedConfidence).toBe(0.7)
   })
 
+  it('should extract dst_ip from feature rows and pass as groupIds', async () => {
+    // Arrange: feature rows with dst_ip
+    const mockFeatureRows = [
+      ...Array.from({ length: 5 }, (_, i) => ({
+        rowid: i,
+        dst_ip: '10.0.0.1',
+        log1p_in_bytes: 5.0, log1p_out_bytes: 4.0, log1p_in_pkts: 3.0,
+        log1p_out_pkts: 2.5, log1p_duration_ms: 6.0, log1p_iat_avg: 4.5,
+        bytes_ratio: 1.2, pkts_per_second: 10.0,
+        is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0,
+      })),
+      ...Array.from({ length: 5 }, (_, i) => ({
+        rowid: i + 5,
+        dst_ip: '10.0.0.2',
+        log1p_in_bytes: 8.0, log1p_out_bytes: 7.0, log1p_in_pkts: 5.0,
+        log1p_out_pkts: 4.5, log1p_duration_ms: 9.0, log1p_iat_avg: 6.5,
+        bytes_ratio: 2.2, pkts_per_second: 20.0,
+        is_tcp: 0, is_udp: 1, is_icmp: 0, port_category: 1,
+      })),
+    ]
+
+    vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
+    vi.mocked(extractFeatures).mockResolvedValue(mockFeatureRows)
+    vi.mocked(trainInWorker).mockResolvedValue({
+      states: Array.from({ length: 10 }, (_, i) => i < 5 ? 0 : 1),
+      nStates: 2, converged: true, iterations: 20, logLikelihood: -500,
+    })
+    vi.mocked(writeStateAssignments).mockResolvedValue(undefined)
+    vi.mocked(getStateSignatures).mockResolvedValue([
+      {
+        state_id: 0, flow_count: 5, avg_in_bytes: 1024, avg_out_bytes: 512,
+        bytes_ratio: 2.0, avg_duration_ms: 100, avg_pkts_per_sec: 10,
+        tcp_pct: 0.8, udp_pct: 0.2, icmp_pct: 0.0,
+        well_known_pct: 0.5, registered_pct: 0.3, ephemeral_pct: 0.2,
+      },
+      {
+        state_id: 1, flow_count: 5, avg_in_bytes: 2048, avg_out_bytes: 1024,
+        bytes_ratio: 2.0, avg_duration_ms: 200, avg_pkts_per_sec: 20,
+        tcp_pct: 0.9, udp_pct: 0.1, icmp_pct: 0.0,
+        well_known_pct: 0.7, registered_pct: 0.2, ephemeral_pct: 0.1,
+      },
+    ])
+    vi.mocked(suggestTactic).mockReturnValue({ tactic: 'Test', confidence: 0.5 })
+    vi.mocked(scoreAnomalies).mockReturnValue([
+      { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
+      { stateId: 1, anomalyScore: 0, anomalyFactors: [] },
+    ])
+
+    await discoverStates({ requestedStates: 2, sampleSize: 50000, onProgress: vi.fn() })
+
+    // Verify trainInWorker was called with groupIds
+    const trainCall = vi.mocked(trainInWorker).mock.calls[0]
+    expect(trainCall[3]).toEqual([
+      '10.0.0.1', '10.0.0.1', '10.0.0.1', '10.0.0.1', '10.0.0.1',
+      '10.0.0.2', '10.0.0.2', '10.0.0.2', '10.0.0.2', '10.0.0.2',
+    ])
+  })
+
   it('should return converged/iterations/logLikelihood from worker', async () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 10 }, (_, i) => ({
       rowid: i,
+      dst_ip: `10.0.0.${(i % 3) + 1}`,
       log1p_in_bytes: 5.0,
       log1p_out_bytes: 4.0,
       log1p_in_pkts: 3.0,

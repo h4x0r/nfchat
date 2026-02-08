@@ -69,21 +69,22 @@ describe('HMM Query Module', () => {
       expect(sql).toContain('rowid');
     });
 
-    it('does not include USING SAMPLE when no sampleSize is provided', async () => {
+    it('does not include LIMIT in subquery when no sampleSize is provided', async () => {
       await extractFeatures();
       const sql = mockExecuteQuery.mock.calls[0][0];
-      expect(sql).not.toMatch(/USING SAMPLE/i);
+      expect(sql).not.toMatch(/LIMIT/i);
     });
 
-    it('includes USING SAMPLE when sampleSize is provided', async () => {
+    it('limits destination IP subquery when sampleSize is provided', async () => {
       await extractFeatures(50000);
       const sql = mockExecuteQuery.mock.calls[0][0];
-      expect(sql).toContain('USING SAMPLE 50000 ROWS');
+      expect(sql).toContain('LIMIT 50000');
     });
 
     it('returns typed FlowFeatureRow results', async () => {
       const mockRow: FlowFeatureRow = {
         rowid: 1,
+        dst_ip: '10.0.0.1',
         log1p_in_bytes: 5.2,
         log1p_out_bytes: 3.1,
         log1p_in_pkts: 2.0,
@@ -101,6 +102,22 @@ describe('HMM Query Module', () => {
 
       const result = await extractFeatures();
       expect(result).toEqual([mockRow]);
+    });
+
+    it('selects dst_ip column and orders by destination then timestamp', async () => {
+      await extractFeatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+
+      expect(sql).toContain('IPV4_DST_ADDR as dst_ip');
+      expect(sql).toContain('ORDER BY IPV4_DST_ADDR, FLOW_START_MILLISECONDS');
+    });
+
+    it('filters to destination IPs with at least 3 flows', async () => {
+      await extractFeatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+
+      expect(sql).toContain('IPV4_DST_ADDR IN');
+      expect(sql).toContain('HAVING COUNT(*) >= 3');
     });
   });
 
@@ -398,6 +415,7 @@ describe('HMM Query Module', () => {
       // These imports would fail at compile time if the types were not exported
       const featureRow: FlowFeatureRow = {
         rowid: 0,
+        dst_ip: '10.0.0.1',
         log1p_in_bytes: 0,
         log1p_out_bytes: 0,
         log1p_in_pkts: 0,

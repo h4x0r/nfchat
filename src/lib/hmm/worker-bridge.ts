@@ -21,6 +21,7 @@ function trainSynchronously(
   matrix: number[][],
   requestedStates: number,
   onProgress?: (percent: number, phase: string) => void,
+  groupIds?: string[],
 ): TrainResult {
   onProgress?.(10, 'scaling')
   const scaler = new StandardScaler()
@@ -35,24 +36,36 @@ function trainSynchronously(
   } else {
     onProgress?.(25, 'bic-selection')
     let bestBic = Infinity
-    nStates = 4
-    for (let k = 4; k <= 10; k++) {
-      const candidate = new GaussianHMM(k, nFeatures, { maxIter: 20, seed: 42 })
-      candidate.fit([scaled])
-      const bic = candidate.bic([scaled])
+    nStates = 2
+    let consecutiveIncreases = 0
+
+    // Subsample for BIC scoring if data is large
+    const bicData = scaled.length > 15000 ? scaled.slice(0, 10000) : scaled
+
+    for (let k = 2; k <= 10; k++) {
+      const candidate = new GaussianHMM(k, nFeatures, { maxIter: 10, tol: 0.1, seed: 42 })
+      candidate.fit([bicData])
+      const bic = candidate.bic([bicData])
       if (bic < bestBic) {
         bestBic = bic
         nStates = k
+        consecutiveIncreases = 0
+      } else {
+        consecutiveIncreases++
+        if (consecutiveIncreases >= 2) break
       }
-      const bicProgress = 25 + Math.round(((k - 3) / 7) * 15)
+      const bicProgress = 25 + Math.round(((k - 1) / 8) * 15)
       onProgress?.(bicProgress, 'bic-selection')
     }
   }
 
   onProgress?.(40, 'training')
 
-  const hmm = new GaussianHMM(nStates, nFeatures, { maxIter: 100, seed: 42 })
-  const fitResult = hmm.fit([scaled], {
+  // Split into per-group sequences if groupIds provided
+  const sequences = buildSequences(scaled, groupIds)
+
+  const hmm = new GaussianHMM(nStates, nFeatures, { maxIter: 50, tol: 1e-2, seed: 42 })
+  const fitResult = hmm.fit(sequences, {
     onProgress: (iter, maxIter) => {
       const percent = 40 + Math.round((iter / maxIter) * 40)
       onProgress?.(percent, 'training')
@@ -61,7 +74,8 @@ function trainSynchronously(
 
   onProgress?.(80, 'predicting')
 
-  const states = hmm.predict(scaled)
+  // Predict per-sequence, reassemble in original row order
+  const states = predictAndReassemble(hmm, scaled, groupIds)
 
   return {
     states,
@@ -73,21 +87,78 @@ function trainSynchronously(
 }
 
 /**
+ * Build per-group sequences from a flat scaled matrix.
+ * If no groupIds, returns the full matrix as a single sequence.
+ */
+function buildSequences(scaled: number[][], groupIds?: string[]): number[][][] {
+  if (!groupIds) return [scaled]
+
+  const groupMap = new Map<string, number[][]>()
+  for (let i = 0; i < scaled.length; i++) {
+    const gid = groupIds[i]
+    let group = groupMap.get(gid)
+    if (!group) {
+      group = []
+      groupMap.set(gid, group)
+    }
+    group.push(scaled[i])
+  }
+  return Array.from(groupMap.values())
+}
+
+/**
+ * Predict per-sequence and reassemble states in original row order.
+ */
+function predictAndReassemble(
+  hmm: GaussianHMM,
+  scaled: number[][],
+  groupIds?: string[],
+): number[] {
+  if (!groupIds) return hmm.predict(scaled)
+
+  // Build index mapping: for each group, which original indices belong to it
+  const groupIndices = new Map<string, number[]>()
+  for (let i = 0; i < scaled.length; i++) {
+    const gid = groupIds[i]
+    let indices = groupIndices.get(gid)
+    if (!indices) {
+      indices = []
+      groupIndices.set(gid, indices)
+    }
+    indices.push(i)
+  }
+
+  const states = new Array<number>(scaled.length)
+
+  for (const [, indices] of groupIndices) {
+    const seq = indices.map(i => scaled[i])
+    const seqStates = hmm.predict(seq)
+    for (let j = 0; j < indices.length; j++) {
+      states[indices[j]] = seqStates[j]
+    }
+  }
+
+  return states
+}
+
+/**
  * Train HMM in a Web Worker (or synchronously if Worker is unavailable).
  *
  * @param matrix - Feature matrix (rows = observations, cols = features)
  * @param requestedStates - Number of states to use (0 = auto-select via BIC)
  * @param onProgress - Optional progress callback (percent, phase)
+ * @param groupIds - Optional per-row group identifiers for sequence splitting
  * @returns Promise with training result
  */
 export function trainInWorker(
   matrix: number[][],
   requestedStates: number,
   onProgress?: (percent: number, phase: string) => void,
+  groupIds?: string[],
 ): Promise<TrainResult> {
   // Fallback: if Worker is not available, run synchronously
   if (typeof Worker === 'undefined') {
-    return Promise.resolve(trainSynchronously(matrix, requestedStates, onProgress))
+    return Promise.resolve(trainSynchronously(matrix, requestedStates, onProgress, groupIds))
   }
 
   return new Promise<TrainResult>((resolve, reject) => {
@@ -128,6 +199,7 @@ export function trainInWorker(
       type: 'train',
       matrix,
       requestedStates,
+      groupIds,
     })
   })
 }

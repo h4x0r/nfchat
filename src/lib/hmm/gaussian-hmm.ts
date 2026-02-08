@@ -247,21 +247,46 @@ export class GaussianHMM {
     const D = this.nFeatures
     const rand = createRng(this.seed)
 
-    // Initialize centroids by picking K random observations
+    // K-means++ initialization
     const centroids: Float64Array[] = new Array(K)
-    const usedIndices = new Set<number>()
-    for (let k = 0; k < K; k++) {
-      let idx: number
-      if (N <= K) {
-        // Fewer observations than states -- just cycle
-        idx = k % N
-      } else {
-        do {
-          idx = Math.floor(rand() * N)
-        } while (usedIndices.has(idx))
-        usedIndices.add(idx)
+    if (N <= K) {
+      // Fewer observations than states -- just cycle
+      for (let k = 0; k < K; k++) {
+        centroids[k] = new Float64Array(allObs[k % N])
       }
-      centroids[k] = new Float64Array(allObs[idx])
+    } else {
+      centroids[0] = new Float64Array(allObs[Math.floor(rand() * N)])
+
+      for (let k = 1; k < K; k++) {
+        // Compute squared distance from each obs to nearest existing centroid
+        const distances = new Float64Array(N)
+        let totalDist = 0
+        for (let i = 0; i < N; i++) {
+          let minDist = Infinity
+          for (let c = 0; c < k; c++) {
+            let dist = 0
+            for (let d = 0; d < D; d++) {
+              const diff = allObs[i][d] - centroids[c][d]
+              dist += diff * diff
+            }
+            if (dist < minDist) minDist = dist
+          }
+          distances[i] = minDist
+          totalDist += minDist
+        }
+
+        // Pick next centroid proportional to squared distance
+        let threshold = rand() * totalDist
+        let idx = 0
+        for (let i = 0; i < N; i++) {
+          threshold -= distances[i]
+          if (threshold <= 0) {
+            idx = i
+            break
+          }
+        }
+        centroids[k] = new Float64Array(allObs[idx])
+      }
     }
 
     // Run 10 iterations of K-means
@@ -342,12 +367,14 @@ export class GaussianHMM {
       this.logPi_[k] = logUniform
     }
 
-    // Uniform transition matrix
+    // Sticky transition prior: prefer self-transitions
     this.logTransMat_ = new Array(K)
+    const diagProb = 0.7
+    const offDiagProb = K > 1 ? 0.3 / (K - 1) : 1.0
     for (let i = 0; i < K; i++) {
       this.logTransMat_[i] = new Float64Array(K)
       for (let j = 0; j < K; j++) {
-        this.logTransMat_[i][j] = logUniform
+        this.logTransMat_[i][j] = Math.log(i === j ? diagProb : offDiagProb)
       }
     }
   }

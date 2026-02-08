@@ -72,10 +72,13 @@ export async function discoverStates(opts: DiscoveryOptions): Promise<DiscoveryR
     row.port_category,
   ])
 
+  // Extract per-destination group IDs for sequence splitting
+  const groupIds = featureRows.map((r) => r.dst_ip)
+
   // Run scaling + BIC + training + prediction in worker
   const workerResult = await trainInWorker(matrix, requestedStates, (percent) => {
     onProgress(10 + Math.round(percent * 0.7))
-  })
+  }, groupIds)
 
   onProgress(80)
 

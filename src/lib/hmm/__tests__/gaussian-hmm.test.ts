@@ -269,6 +269,74 @@ describe('GaussianHMM', () => {
     })
   })
 
+  describe('k-means++ initialization', () => {
+    it('spreads centroids to different clusters', () => {
+      // Two well-separated clusters: near [0,0] and near [100,100]
+      const sequences: number[][][] = []
+      // Cluster A: 50 points near [0,0]
+      const clusterA: number[][] = []
+      for (let i = 0; i < 50; i++) {
+        clusterA.push([Math.sin(i) * 0.5, Math.cos(i) * 0.5])
+      }
+      // Cluster B: 50 points near [100,100]
+      const clusterB: number[][] = []
+      for (let i = 0; i < 50; i++) {
+        clusterB.push([100 + Math.sin(i) * 0.5, 100 + Math.cos(i) * 0.5])
+      }
+      sequences.push([...clusterA, ...clusterB])
+
+      const hmm = new GaussianHMM(2, 2, { maxIter: 30, seed: 42 })
+      hmm.fit(sequences)
+
+      const json = hmm.toJSON()
+      const means = json.means
+
+      // One mean should be near [0,0] and the other near [100,100]
+      const nearZero = means.some(m => Math.abs(m[0]) < 10 && Math.abs(m[1]) < 10)
+      const nearHundred = means.some(m => Math.abs(m[0] - 100) < 10 && Math.abs(m[1] - 100) < 10)
+      expect(nearZero).toBe(true)
+      expect(nearHundred).toBe(true)
+    })
+
+    it('is deterministic with the same seed', () => {
+      const sequences = generateSyntheticSequences(5, 50, 99)
+
+      const hmm1 = new GaussianHMM(2, 2, { maxIter: 20, seed: 77 })
+      hmm1.fit(sequences)
+      const pred1 = hmm1.predict(sequences[0])
+
+      const hmm2 = new GaussianHMM(2, 2, { maxIter: 20, seed: 77 })
+      hmm2.fit(sequences)
+      const pred2 = hmm2.predict(sequences[0])
+
+      expect(pred1).toEqual(pred2)
+    })
+
+    it('initializes transition matrix with sticky diagonal', () => {
+      const sequences = generateSyntheticSequences(3, 30, 42)
+      const hmm = new GaussianHMM(2, 2, { maxIter: 3, seed: 42 })
+      hmm.fit(sequences)
+
+      const json = hmm.toJSON()
+      const trans = json.transitionMatrix
+
+      // After only 3 iterations, the diagonal should still dominate
+      // because the sticky prior starts with diag=0.7
+      for (let i = 0; i < trans.length; i++) {
+        for (let j = 0; j < trans[i].length; j++) {
+          if (i === j) {
+            // Diagonal should be greater than any off-diagonal in this row
+            for (let k = 0; k < trans[i].length; k++) {
+              if (k !== i) {
+                expect(trans[i][i]).toBeGreaterThan(trans[i][k])
+              }
+            }
+          }
+        }
+      }
+    })
+  })
+
   describe('edge cases', () => {
     it('handles single-state model', () => {
       const sequences = generateSyntheticSequences(3, 30)
