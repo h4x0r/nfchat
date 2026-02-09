@@ -114,8 +114,13 @@ const BATCH_SIZE = 1000;
 export async function extractFeatures(
   sampleSize?: number
 ): Promise<FlowFeatureRow[]> {
-  const limitClause = sampleSize !== undefined
-    ? `\n    ORDER BY RANDOM() LIMIT ${Number(sampleSize)}`
+  // Limit destination IPs to keep total rows under sampleSize.
+  // Heuristic: ~25 flows per IP on average, capped at 2000 IPs.
+  const ipLimit = sampleSize !== undefined
+    ? Math.min(2000, Math.max(200, Math.floor(Number(sampleSize) / 25)))
+    : 0;
+  const limitClause = ipLimit > 0
+    ? `\n    ORDER BY RANDOM() LIMIT ${ipLimit}`
     : '';
 
   return executeQuery<FlowFeatureRow>(`

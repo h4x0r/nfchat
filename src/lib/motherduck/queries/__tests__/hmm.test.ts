@@ -75,10 +75,11 @@ describe('HMM Query Module', () => {
       expect(sql).not.toMatch(/LIMIT/i);
     });
 
-    it('limits destination IP subquery when sampleSize is provided', async () => {
+    it('limits destination IPs to cap total rows when sampleSize is provided', async () => {
       await extractFeatures(50000);
       const sql = mockExecuteQuery.mock.calls[0][0];
-      expect(sql).toContain('LIMIT 50000');
+      // sampleSize=50000, assume ~25 flows/IP → limit ~2000 IPs
+      expect(sql).toContain('LIMIT 2000');
     });
 
     it('returns typed FlowFeatureRow results', async () => {
