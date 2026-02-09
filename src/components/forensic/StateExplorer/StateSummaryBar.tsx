@@ -21,7 +21,7 @@ export const StateSummaryBar = memo(function StateSummaryBar({
     <div className="px-4 py-3">
       <div className="flex h-6 w-full rounded overflow-hidden">
         {states.map((state) => {
-          const tactic = tacticAssignments[state.stateId] ?? state.suggestedTactic
+          const tactic = tacticAssignments[state.stateId] || 'Unassigned'
           const color = ATTACK_COLORS[tactic] || '#71717a'
           const widthPct = totalFlows > 0 ? (state.flowCount / totalFlows) * 100 : 0
 

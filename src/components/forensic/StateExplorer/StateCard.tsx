@@ -45,8 +45,8 @@ export const StateCard = memo(function StateCard({
 }: StateCardProps) {
   const { topHosts, timeline, connStates, portServices, sampleFlows, loading: flowsLoading } = useStateDetails(state.stateId, expanded)
 
-  const currentTactic = assignedTactic ?? state.suggestedTactic
-  const tacticColor = getTacticColor(currentTactic)
+  const currentTactic = assignedTactic || ''
+  const tacticColor = currentTactic ? getTacticColor(currentTactic) : '#71717a'
 
   return (
     <div
@@ -99,8 +99,6 @@ export const StateCard = memo(function StateCard({
         </div>
         <TacticSelector
           stateId={state.stateId}
-          suggestedTactic={state.suggestedTactic}
-          suggestedConfidence={state.suggestedConfidence}
           assignedTactic={assignedTactic}
           onAssign={onTacticAssign}
         />

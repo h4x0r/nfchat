@@ -13,10 +13,6 @@ vi.mock('./worker-bridge', () => ({
   trainInWorker: vi.fn(),
 }))
 
-vi.mock('./state-analyzer', () => ({
-  suggestTactic: vi.fn(),
-}))
-
 vi.mock('./anomaly', () => ({
   scoreAnomalies: vi.fn(),
 }))
@@ -33,7 +29,6 @@ vi.mock('@/lib/logger', () => ({
 
 import { extractFeatures, ensureHmmStateColumn, writeStateAssignments, getStateSignatures } from '@/lib/motherduck/queries'
 import { trainInWorker } from './worker-bridge'
-import { suggestTactic } from './state-analyzer'
 import { scoreAnomalies } from './anomaly'
 
 describe('discoverStates', () => {
@@ -140,12 +135,6 @@ describe('discoverStates', () => {
 
     vi.mocked(getStateSignatures).mockResolvedValue(mockSignatures)
 
-    // Mock tactic suggestions
-    vi.mocked(suggestTactic).mockImplementation((sig) => ({
-      tactic: sig.stateId === 0 ? 'Reconnaissance' : 'Command and Control',
-      confidence: 0.8,
-    }))
-
     // Mock anomaly scores
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 20, anomalyFactors: ['bytes_ratio'] },
@@ -170,7 +159,6 @@ describe('discoverStates', () => {
     expect(trainInWorker).toHaveBeenCalledOnce()
     expect(writeStateAssignments).toHaveBeenCalledOnce()
     expect(getStateSignatures).toHaveBeenCalledOnce()
-    expect(suggestTactic).toHaveBeenCalledTimes(4)
     expect(scoreAnomalies).toHaveBeenCalledOnce()
 
     // Verify progress calls include 10, 80, 90
@@ -307,7 +295,6 @@ describe('discoverStates', () => {
         ephemeral_pct: 0.1,
       },
     ])
-    vi.mocked(suggestTactic).mockReturnValue({ tactic: 'Test', confidence: 0.5 })
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
       { stateId: 1, anomalyScore: 0, anomalyFactors: [] },
@@ -400,8 +387,6 @@ describe('discoverStates', () => {
         ephemeral_pct: 0.3,
       },
     ])
-    vi.mocked(suggestTactic).mockReturnValue({ tactic: 'Test', confidence: 0.5 })
-
     // Mock anomaly scores with different values
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 15, anomalyFactors: ['bytes_ratio'] },
@@ -430,7 +415,7 @@ describe('discoverStates', () => {
     expect(result.profiles[2].anomalyFactors).toEqual([])
   })
 
-  it('should call suggestTactic for each signature', async () => {
+  it('should not include suggestedTactic or suggestedConfidence on profiles', async () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 12 }, (_, i) => ({
       rowid: i,
@@ -491,10 +476,6 @@ describe('discoverStates', () => {
         ephemeral_pct: 0.1,
       },
     ])
-    vi.mocked(suggestTactic).mockImplementation((sig) => ({
-      tactic: sig.stateId === 0 ? 'Reconnaissance' : 'Lateral Movement',
-      confidence: sig.stateId === 0 ? 0.9 : 0.7,
-    }))
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
       { stateId: 1, anomalyScore: 0, anomalyFactors: [] },
@@ -507,12 +488,11 @@ describe('discoverStates', () => {
       onProgress: vi.fn(),
     })
 
-    // Assert
-    expect(suggestTactic).toHaveBeenCalledTimes(2)
-    expect(result.profiles[0].suggestedTactic).toBe('Reconnaissance')
-    expect(result.profiles[0].suggestedConfidence).toBe(0.9)
-    expect(result.profiles[1].suggestedTactic).toBe('Lateral Movement')
-    expect(result.profiles[1].suggestedConfidence).toBe(0.7)
+    // Assert: profiles should NOT have suggestedTactic or suggestedConfidence
+    for (const profile of result.profiles) {
+      expect(profile).not.toHaveProperty('suggestedTactic')
+      expect(profile).not.toHaveProperty('suggestedConfidence')
+    }
   })
 
   it('should extract dst_ip from feature rows and pass as groupIds', async () => {
@@ -557,7 +537,6 @@ describe('discoverStates', () => {
         well_known_pct: 0.7, registered_pct: 0.2, ephemeral_pct: 0.1,
       },
     ])
-    vi.mocked(suggestTactic).mockReturnValue({ tactic: 'Test', confidence: 0.5 })
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
       { stateId: 1, anomalyScore: 0, anomalyFactors: [] },
@@ -619,7 +598,6 @@ describe('discoverStates', () => {
         ephemeral_pct: 0.2,
       },
     ])
-    vi.mocked(suggestTactic).mockReturnValue({ tactic: 'Test', confidence: 0.5 })
     vi.mocked(scoreAnomalies).mockReturnValue([
       { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
     ])

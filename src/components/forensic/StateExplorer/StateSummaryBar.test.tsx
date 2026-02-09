@@ -15,8 +15,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 5,
     protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
     portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-    suggestedTactic: 'Benign',
-    suggestedConfidence: 0.8,
   },
   {
     stateId: 1,
@@ -28,8 +26,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 20,
     protocolDist: { tcp: 0.6, udp: 0.3, icmp: 0.1 },
     portCategoryDist: { wellKnown: 0.7, registered: 0.2, ephemeral: 0.1 },
-    suggestedTactic: 'Reconnaissance',
-    suggestedConfidence: 0.9,
   },
 ]
 
@@ -67,11 +63,11 @@ describe('StateSummaryBar', () => {
     expect(seg0.style.backgroundColor).toBe('rgb(124, 58, 237)')
   })
 
-  it('colors segments by suggested tactic when no assignment', () => {
+  it('colors segments as unassigned when no tactic assignment', () => {
     render(<StateSummaryBar states={mockStates} tacticAssignments={{}} />)
     const seg0 = screen.getByTestId('segment-0')
-    // Benign color #22c55e -> rgb(34, 197, 94)
-    expect(seg0.style.backgroundColor).toBe('rgb(34, 197, 94)')
+    // Unassigned color fallback #71717a -> rgb(113, 113, 122)
+    expect(seg0.style.backgroundColor).toBe('rgb(113, 113, 122)')
   })
 
   it('calls onStateClick when a segment is clicked', async () => {

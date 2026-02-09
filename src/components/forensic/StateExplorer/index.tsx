@@ -110,8 +110,7 @@ export function StateExplorer() {
       avgPktsPerSec: state.avgPktsPerSec,
       protocolDist: state.protocolDist,
       portCategoryDist: state.portCategoryDist,
-      tactic: tacticAssignments[state.stateId] ?? state.suggestedTactic,
-      confidence: state.suggestedConfidence,
+      tactic: tacticAssignments[state.stateId] || 'Unassigned',
     }))
 
     const blob = new Blob([JSON.stringify(exported, null, 2)], { type: 'application/json' })

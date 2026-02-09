@@ -14,8 +14,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 5,
     protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
     portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-    suggestedTactic: 'Benign',
-    suggestedConfidence: 0.8,
   },
   {
     stateId: 1,
@@ -27,8 +25,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 20,
     protocolDist: { tcp: 0.6, udp: 0.3, icmp: 0.1 },
     portCategoryDist: { wellKnown: 0.7, registered: 0.2, ephemeral: 0.1 },
-    suggestedTactic: 'Reconnaissance',
-    suggestedConfidence: 0.9,
   },
   {
     stateId: 2,
@@ -40,8 +36,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 1,
     protocolDist: { tcp: 0.9, udp: 0.08, icmp: 0.02 },
     portCategoryDist: { wellKnown: 0.8, registered: 0.15, ephemeral: 0.05 },
-    suggestedTactic: 'Command and Control',
-    suggestedConfidence: 0.95,
   },
 ]
 

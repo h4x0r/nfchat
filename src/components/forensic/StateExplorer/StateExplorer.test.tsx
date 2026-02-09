@@ -47,8 +47,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 5,
     protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
     portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-    suggestedTactic: 'Benign',
-    suggestedConfidence: 0.8,
   },
   {
     stateId: 1,
@@ -60,8 +58,6 @@ const mockStates: StateProfile[] = [
     avgPktsPerSec: 20,
     protocolDist: { tcp: 0.6, udp: 0.3, icmp: 0.1 },
     portCategoryDist: { wellKnown: 0.7, registered: 0.2, ephemeral: 0.1 },
-    suggestedTactic: 'Reconnaissance',
-    suggestedConfidence: 0.9,
   },
 ]
 
@@ -139,9 +135,12 @@ describe('StateExplorer', () => {
     useStore.setState({ hmmStates: mockStates })
     render(<StateExplorer />)
 
-    // Find the first combobox (State 0's tactic selector) - the one showing 'Benign'
-    const benignSelect = screen.getByDisplayValue('Benign')
-    await user.selectOptions(benignSelect, 'Exfiltration')
+    // Find all comboboxes, then select the one that has the 'Exfiltration' option (a tactic selector)
+    const allSelects = screen.getAllByRole('combobox')
+    const tacticSelect = allSelects.find(
+      (el) => el.querySelector('option[value="Exfiltration"]') !== null
+    )!
+    await user.selectOptions(tacticSelect, 'Exfiltration')
 
     expect(useStore.getState().tacticAssignments[0]).toBe('Exfiltration')
   })
@@ -199,10 +198,8 @@ describe('StateExplorer', () => {
       expect(parsed).toHaveLength(2)
       expect(parsed[0].stateId).toBe(0)
       expect(parsed[0].tactic).toBe('Exfiltration')
-      expect(parsed[0].confidence).toBe(0.8)
       expect(parsed[1].stateId).toBe(1)
-      expect(parsed[1].tactic).toBe('Reconnaissance')
-      expect(parsed[1].confidence).toBe(0.9)
+      expect(parsed[1].tactic).toBe('Unassigned')
 
       // Verify download was triggered
       expect(mockAnchor.download).toMatch(/^state-profiles-\d+\.json$/)

@@ -22,8 +22,6 @@ const mockState: StateProfile = {
   avgPktsPerSec: 12.5,
   protocolDist: { tcp: 0.75, udp: 0.2, icmp: 0.05 },
   portCategoryDist: { wellKnown: 0.6, registered: 0.3, ephemeral: 0.1 },
-  suggestedTactic: 'Reconnaissance',
-  suggestedConfidence: 0.85,
 }
 
 const defaultDetails = {
@@ -85,7 +83,7 @@ describe('StateCard', () => {
     expect(screen.getByText(/75%/)).toBeInTheDocument()
   })
 
-  it('renders tactic selector with suggested tactic', () => {
+  it('renders tactic selector showing unassigned when no tactic assigned', () => {
     render(
       <StateCard
         state={mockState}
@@ -95,7 +93,6 @@ describe('StateCard', () => {
       />
     )
     expect(screen.getByRole('combobox')).toBeInTheDocument()
-    expect(screen.getByDisplayValue('Reconnaissance')).toBeInTheDocument()
   })
 
   it('calls onTacticAssign when tactic is changed', async () => {

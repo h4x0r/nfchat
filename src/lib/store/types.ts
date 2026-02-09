@@ -134,8 +134,6 @@ export interface StateProfile {
   avgPktsPerSec: number
   protocolDist: { tcp: number; udp: number; icmp: number }
   portCategoryDist: { wellKnown: number; registered: number; ephemeral: number }
-  suggestedTactic: string
-  suggestedConfidence: number
   anomalyScore?: number
   anomalyFactors?: string[]
 }

@@ -5,7 +5,7 @@
  * 1. Extract features from database
  * 2. Train HMM model via Web Worker
  * 3. Write state assignments back to database
- * 4. Generate state profiles with tactic suggestions
+ * 4. Generate state profiles
  * 5. Score anomalies and merge into profiles
  *
  * Extracted from StateExplorer/index.tsx handleDiscover() for testability and reusability.
@@ -13,7 +13,6 @@
 
 import { extractFeatures, ensureHmmStateColumn, writeStateAssignments, getStateSignatures } from '@/lib/motherduck/queries'
 import { trainInWorker } from './worker-bridge'
-import { suggestTactic } from './state-analyzer'
 import { scoreAnomalies } from './anomaly'
 import { logger } from '@/lib/logger'
 import type { StateProfile } from '@/lib/store/types'
@@ -98,34 +97,18 @@ export async function discoverStates(opts: DiscoveryOptions): Promise<DiscoveryR
   // Get state signatures from DB
   const signatures = await getStateSignatures()
 
-  // Build StateProfile objects with tactic suggestions
-  const profiles: StateProfile[] = signatures.map((sig) => {
-    const suggestion = suggestTactic({
-      stateId: sig.state_id,
-      flowCount: sig.flow_count,
-      avgInBytes: sig.avg_in_bytes,
-      avgOutBytes: sig.avg_out_bytes,
-      bytesRatio: sig.bytes_ratio,
-      avgDurationMs: sig.avg_duration_ms,
-      avgPktsPerSec: sig.avg_pkts_per_sec,
-      protocolDist: { tcp: sig.tcp_pct, udp: sig.udp_pct, icmp: sig.icmp_pct },
-      portCategoryDist: { wellKnown: sig.well_known_pct, registered: sig.registered_pct, ephemeral: sig.ephemeral_pct },
-    })
-
-    return {
-      stateId: sig.state_id,
-      flowCount: sig.flow_count,
-      avgInBytes: sig.avg_in_bytes,
-      avgOutBytes: sig.avg_out_bytes,
-      bytesRatio: sig.bytes_ratio,
-      avgDurationMs: sig.avg_duration_ms,
-      avgPktsPerSec: sig.avg_pkts_per_sec,
-      protocolDist: { tcp: sig.tcp_pct, udp: sig.udp_pct, icmp: sig.icmp_pct },
-      portCategoryDist: { wellKnown: sig.well_known_pct, registered: sig.registered_pct, ephemeral: sig.ephemeral_pct },
-      suggestedTactic: suggestion.tactic,
-      suggestedConfidence: suggestion.confidence,
-    }
-  })
+  // Build StateProfile objects (tactic assignment is left to the analyst)
+  const profiles: StateProfile[] = signatures.map((sig) => ({
+    stateId: sig.state_id,
+    flowCount: sig.flow_count,
+    avgInBytes: sig.avg_in_bytes,
+    avgOutBytes: sig.avg_out_bytes,
+    bytesRatio: sig.bytes_ratio,
+    avgDurationMs: sig.avg_duration_ms,
+    avgPktsPerSec: sig.avg_pkts_per_sec,
+    protocolDist: { tcp: sig.tcp_pct, udp: sig.udp_pct, icmp: sig.icmp_pct },
+    portCategoryDist: { wellKnown: sig.well_known_pct, registered: sig.registered_pct, ephemeral: sig.ephemeral_pct },
+  }))
 
   // CRITICAL: Score anomalies and merge into profiles
   const anomalyScores = scoreAnomalies(profiles)

@@ -14,8 +14,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 2.5,
       protocolDist: { tcp: 0.9, udp: 0.1, icmp: 0 },
       portCategoryDist: { wellKnown: 0.8, registered: 0.15, ephemeral: 0.05 },
-      suggestedTactic: 'Reconnaissance',
-      suggestedConfidence: 0.85,
     }
 
     const narrative = generateNarrative(scanState)
@@ -36,8 +34,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 50,
       protocolDist: { tcp: 0.95, udp: 0.05, icmp: 0 },
       portCategoryDist: { wellKnown: 0.1, registered: 0.2, ephemeral: 0.7 },
-      suggestedTactic: 'Exfiltration',
-      suggestedConfidence: 0.92,
     }
 
     const narrative = generateNarrative(exfilState)
@@ -58,8 +54,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 5,
       protocolDist: { tcp: 0.05, udp: 0.95, icmp: 0 },
       portCategoryDist: { wellKnown: 0.9, registered: 0.05, ephemeral: 0.05 },
-      suggestedTactic: 'Command and Control',
-      suggestedConfidence: 0.75,
     }
 
     const narrative = generateNarrative(dnsState)
@@ -79,8 +73,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 20,
       protocolDist: { tcp: 0.98, udp: 0.02, icmp: 0 },
       portCategoryDist: { wellKnown: 0.7, registered: 0.2, ephemeral: 0.1 },
-      suggestedTactic: 'Normal',
-      suggestedConfidence: 0.88,
     }
 
     const narrative = generateNarrative(webState)
@@ -100,8 +92,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 1,
       protocolDist: { tcp: 0, udp: 0.05, icmp: 0.95 },
       portCategoryDist: { wellKnown: 0, registered: 0, ephemeral: 0 },
-      suggestedTactic: 'Discovery',
-      suggestedConfidence: 0.80,
     }
 
     const narrative = generateNarrative(icmpState)
@@ -120,8 +110,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 10,
       protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
       portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-      suggestedTactic: 'Persistence',
-      suggestedConfidence: 0.78,
     }
 
     const narrative = generateNarrative(longState)
@@ -141,8 +129,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 15,
       protocolDist: { tcp: 0.5, udp: 0.45, icmp: 0.05 },
       portCategoryDist: { wellKnown: 0.4, registered: 0.3, ephemeral: 0.3 },
-      suggestedTactic: 'Lateral Movement',
-      suggestedConfidence: 0.70,
     }
 
     const narrative = generateNarrative(mixedState)
@@ -161,8 +147,6 @@ describe('generateNarrative', () => {
       avgPktsPerSec: 0,
       protocolDist: { tcp: 0, udp: 0, icmp: 0 },
       portCategoryDist: { wellKnown: 0, registered: 0, ephemeral: 0 },
-      suggestedTactic: 'Unknown',
-      suggestedConfidence: 0.5,
     }
 
     const narrative = generateNarrative(zeroState)
@@ -182,8 +166,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Reconnaissance',
-        suggestedConfidence: 0.8,
       }
 
       const mediumVolumeState: StateProfile = {
@@ -211,8 +193,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Exfiltration',
-        suggestedConfidence: 0.8,
       }
 
       const highVolumeState: StateProfile = {
@@ -242,8 +222,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Reconnaissance',
-        suggestedConfidence: 0.8,
       }
 
       const mediumState: StateProfile = {
@@ -270,8 +248,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Persistence',
-        suggestedConfidence: 0.8,
       }
 
       const longState: StateProfile = {
@@ -300,8 +276,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Command and Control',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(bidirectionalState)
@@ -319,8 +293,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Normal',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -340,8 +312,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Normal',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -361,8 +331,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 }, // exactly 0.8
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Reconnaissance',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -382,8 +350,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 0.81, udp: 0.14, icmp: 0.05 }, // just over 0.8
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Reconnaissance',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -401,8 +367,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 0.05, udp: 0.7, icmp: 0.25 }, // UDP dominant, ICMP significant
         portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-        suggestedTactic: 'Discovery',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -422,8 +386,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.2, registered: 0.61, ephemeral: 0.19 },
-        suggestedTactic: 'Command and Control',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)
@@ -441,8 +403,6 @@ describe('generateNarrative', () => {
         avgPktsPerSec: 10,
         protocolDist: { tcp: 1.0, udp: 0, icmp: 0 },
         portCategoryDist: { wellKnown: 0.4, registered: 0.3, ephemeral: 0.3 },
-        suggestedTactic: 'Lateral Movement',
-        suggestedConfidence: 0.8,
       }
 
       const narrative = generateNarrative(state)

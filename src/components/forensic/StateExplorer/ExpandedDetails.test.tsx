@@ -28,8 +28,6 @@ const mockState: StateProfile = {
   avgPktsPerSec: 15,
   protocolDist: { tcp: 0.9, udp: 0.08, icmp: 0.02 },
   portCategoryDist: { wellKnown: 0.7, registered: 0.2, ephemeral: 0.1 },
-  suggestedTactic: 'Exfiltration',
-  suggestedConfidence: 0.75,
 }
 
 describe('StateCard expanded details', () => {

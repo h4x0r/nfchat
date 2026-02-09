@@ -22,8 +22,6 @@ const mockState1: StateProfile = {
   avgPktsPerSec: 12.5,
   protocolDist: { tcp: 0.75, udp: 0.2, icmp: 0.05 },
   portCategoryDist: { wellKnown: 0.6, registered: 0.3, ephemeral: 0.1 },
-  suggestedTactic: 'Reconnaissance',
-  suggestedConfidence: 0.85,
 }
 
 const mockState2: StateProfile = {
@@ -36,8 +34,6 @@ const mockState2: StateProfile = {
   avgPktsPerSec: 25.0,
   protocolDist: { tcp: 0.9, udp: 0.08, icmp: 0.02 },
   portCategoryDist: { wellKnown: 0.8, registered: 0.15, ephemeral: 0.05 },
-  suggestedTactic: 'Command and Control',
-  suggestedConfidence: 0.92,
 }
 
 describe('StateComparison', () => {

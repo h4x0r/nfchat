@@ -13,8 +13,6 @@ describe('scoreAnomalies', () => {
     avgPktsPerSec: 10,
     protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
     portCategoryDist: { wellKnown: 0.5, registered: 0.3, ephemeral: 0.2 },
-    suggestedTactic: 'Reconnaissance',
-    suggestedConfidence: 0.8,
     ...overrides,
   })
 

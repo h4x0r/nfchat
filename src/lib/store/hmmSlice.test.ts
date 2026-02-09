@@ -61,8 +61,6 @@ describe('hmmSlice', () => {
           avgPktsPerSec: 10,
           protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
           portCategoryDist: { wellKnown: 0.6, registered: 0.3, ephemeral: 0.1 },
-          suggestedTactic: 'Reconnaissance',
-          suggestedConfidence: 0.85,
         },
       ];
       store.getState().setHmmStates(states);
@@ -81,8 +79,6 @@ describe('hmmSlice', () => {
           avgPktsPerSec: 5,
           protocolDist: { tcp: 1, udp: 0, icmp: 0 },
           portCategoryDist: { wellKnown: 1, registered: 0, ephemeral: 0 },
-          suggestedTactic: 'Initial Access',
-          suggestedConfidence: 0.5,
         },
       ];
       const second = [
@@ -96,8 +92,6 @@ describe('hmmSlice', () => {
           avgPktsPerSec: 20,
           protocolDist: { tcp: 0.5, udp: 0.5, icmp: 0 },
           portCategoryDist: { wellKnown: 0.2, registered: 0.5, ephemeral: 0.3 },
-          suggestedTactic: 'Exfiltration',
-          suggestedConfidence: 0.92,
         },
       ];
       store.getState().setHmmStates(first);
@@ -239,8 +233,6 @@ describe('hmmSlice', () => {
           avgPktsPerSec: 10,
           protocolDist: { tcp: 0.8, udp: 0.15, icmp: 0.05 },
           portCategoryDist: { wellKnown: 0.6, registered: 0.3, ephemeral: 0.1 },
-          suggestedTactic: 'Reconnaissance',
-          suggestedConfidence: 0.85,
         },
       ]);
       store.getState().setHmmTraining(true);
