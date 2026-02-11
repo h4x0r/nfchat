@@ -18,6 +18,10 @@ export const FEATURE_NAMES = [
   'is_udp',
   'is_icmp',
   'port_category',
+  'is_conn_complete',
+  'is_conn_rejected',
+  'log1p_bytes_per_pkt',
+  'log1p_inter_flow_gap',
 ] as const
 
 export type FeatureName = (typeof FEATURE_NAMES)[number]
@@ -31,6 +35,8 @@ export interface FlowFeatures {
   PROTOCOL: number
   L4_DST_PORT: number
   SRC_TO_DST_IAT_AVG?: number
+  CONN_STATE?: string
+  INTER_FLOW_GAP_MS?: number
 }
 
 // Protocol constants
@@ -38,8 +44,11 @@ const PROTO_TCP = 6
 const PROTO_UDP = 17
 const PROTO_ICMP = 1
 
+// Connection states indicating rejected/failed/scan flows
+const REJECTED_STATES = new Set(['REJ', 'RSTO', 'RSTR', 'S0'])
+
 /**
- * Extract 12 numeric features from a single network flow.
+ * Extract 16 numeric features from a single network flow.
  *
  * Feature order matches FEATURE_NAMES:
  *  [0] log1p_in_bytes
@@ -54,9 +63,13 @@ const PROTO_ICMP = 1
  *  [9] is_udp
  * [10] is_icmp
  * [11] port_category
+ * [12] is_conn_complete
+ * [13] is_conn_rejected
+ * [14] log1p_bytes_per_pkt
+ * [15] log1p_inter_flow_gap
  */
 export function extractFlowFeatures(flow: FlowFeatures): number[] {
-  const features = new Array<number>(12)
+  const features = new Array<number>(16)
 
   // Volume features (log-scaled)
   features[0] = Math.log1p(flow.IN_BYTES)
@@ -83,6 +96,18 @@ export function extractFlowFeatures(flow: FlowFeatures): number[] {
 
   // Port category: 0=well-known, 1=registered, 2=ephemeral
   features[11] = portCategory(flow.L4_DST_PORT)
+
+  // Connection state indicators
+  const connState = flow.CONN_STATE ?? ''
+  features[12] = connState === 'SF' ? 1 : 0
+  features[13] = REJECTED_STATES.has(connState) ? 1 : 0
+
+  // Bytes per packet (log-scaled)
+  const totalBytes = flow.IN_BYTES + flow.OUT_BYTES
+  features[14] = Math.log1p(totalBytes / Math.max(totalPkts, 1))
+
+  // Inter-flow gap (log-scaled, defaults to 0 if not provided)
+  features[15] = Math.log1p(flow.INTER_FLOW_GAP_MS ?? 0)
 
   return features
 }

@@ -59,7 +59,7 @@ export async function discoverStates(opts: DiscoveryOptions): Promise<DiscoveryR
 
   onProgress(10)
 
-  // Convert to feature matrix (12 features per row)
+  // Convert to feature matrix (16 features per row)
   const matrix = featureRows.map((row) => [
     row.log1p_in_bytes,
     row.log1p_out_bytes,
@@ -73,6 +73,10 @@ export async function discoverStates(opts: DiscoveryOptions): Promise<DiscoveryR
     row.is_udp,
     row.is_icmp,
     row.port_category,
+    row.is_conn_complete,
+    row.is_conn_rejected,
+    row.log1p_bytes_per_pkt,
+    row.log1p_inter_flow_gap,
   ])
 
   // Extract per-destination group IDs for sequence splitting

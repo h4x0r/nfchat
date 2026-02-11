@@ -53,6 +53,10 @@ describe('discoverStates', () => {
       is_udp: Math.random() > 0.5 ? 1 : 0,
       is_icmp: Math.random() > 0.5 ? 1 : 0,
       port_category: Math.floor(Math.random() * 3),
+      is_conn_complete: Math.random() > 0.5 ? 1 : 0,
+      is_conn_rejected: Math.random() > 0.8 ? 1 : 0,
+      log1p_bytes_per_pkt: 4.0 + Math.random(),
+      log1p_inter_flow_gap: 2.0 + Math.random(),
     }))
 
     vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
@@ -200,6 +204,10 @@ describe('discoverStates', () => {
         is_udp: 0,
         is_icmp: 0,
         port_category: 0,
+        is_conn_complete: 1,
+        is_conn_rejected: 0,
+        log1p_bytes_per_pkt: 4.5,
+        log1p_inter_flow_gap: 0,
       },
       {
         rowid: 1,
@@ -216,6 +224,10 @@ describe('discoverStates', () => {
         is_udp: 0,
         is_icmp: 0,
         port_category: 0,
+        is_conn_complete: 1,
+        is_conn_rejected: 0,
+        log1p_bytes_per_pkt: 4.6,
+        log1p_inter_flow_gap: 2.1,
       },
     ])
 
@@ -251,6 +263,10 @@ describe('discoverStates', () => {
       is_udp: 0,
       is_icmp: 0,
       port_category: 0,
+      is_conn_complete: 1,
+      is_conn_rejected: 0,
+      log1p_bytes_per_pkt: 4.5,
+      log1p_inter_flow_gap: 2.0,
     }))
 
     vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
@@ -328,6 +344,10 @@ describe('discoverStates', () => {
       is_udp: 0,
       is_icmp: 0,
       port_category: 0,
+      is_conn_complete: 1,
+      is_conn_rejected: 0,
+      log1p_bytes_per_pkt: 4.5,
+      log1p_inter_flow_gap: 2.0,
     }))
 
     vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
@@ -432,6 +452,10 @@ describe('discoverStates', () => {
       is_udp: 0,
       is_icmp: 0,
       port_category: 0,
+      is_conn_complete: 1,
+      is_conn_rejected: 0,
+      log1p_bytes_per_pkt: 4.5,
+      log1p_inter_flow_gap: 2.0,
     }))
 
     vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
@@ -505,6 +529,7 @@ describe('discoverStates', () => {
         log1p_out_pkts: 2.5, log1p_duration_ms: 6.0, log1p_iat_avg: 4.5,
         bytes_ratio: 1.2, pkts_per_second: 10.0,
         is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0,
+        is_conn_complete: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 4.5, log1p_inter_flow_gap: 2.0,
       })),
       ...Array.from({ length: 5 }, (_, i) => ({
         rowid: i + 5,
@@ -513,6 +538,7 @@ describe('discoverStates', () => {
         log1p_out_pkts: 4.5, log1p_duration_ms: 9.0, log1p_iat_avg: 6.5,
         bytes_ratio: 2.2, pkts_per_second: 20.0,
         is_tcp: 0, is_udp: 1, is_icmp: 0, port_category: 1,
+        is_conn_complete: 0, is_conn_rejected: 1, log1p_bytes_per_pkt: 6.2, log1p_inter_flow_gap: 3.5,
       })),
     ]
 
@@ -552,6 +578,75 @@ describe('discoverStates', () => {
     ])
   })
 
+  it('should build 16-element feature matrix rows from FlowFeatureRow', async () => {
+    // Arrange
+    const mockFeatureRows = Array.from({ length: 12 }, (_, i) => ({
+      rowid: i,
+      dst_ip: `10.0.0.${(i % 4) + 1}`,
+      log1p_in_bytes: 5.0,
+      log1p_out_bytes: 4.0,
+      log1p_in_pkts: 3.0,
+      log1p_out_pkts: 2.5,
+      log1p_duration_ms: 6.0,
+      log1p_iat_avg: 4.5,
+      bytes_ratio: 1.2,
+      pkts_per_second: 10.0,
+      is_tcp: 1,
+      is_udp: 0,
+      is_icmp: 0,
+      port_category: 0,
+      is_conn_complete: 1,
+      is_conn_rejected: 0,
+      log1p_bytes_per_pkt: 5.3,
+      log1p_inter_flow_gap: 3.2,
+    }))
+
+    vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)
+    vi.mocked(extractFeatures).mockResolvedValue(mockFeatureRows)
+    vi.mocked(trainInWorker).mockResolvedValue({
+      states: Array.from({ length: 12 }, (_, i) => i % 2),
+      nStates: 2,
+      converged: true,
+      iterations: 15,
+      logLikelihood: -300,
+    })
+    vi.mocked(writeStateAssignments).mockResolvedValue(undefined)
+    vi.mocked(getStateSignatures).mockResolvedValue([
+      {
+        state_id: 0, flow_count: 6, avg_in_bytes: 1024, avg_out_bytes: 512,
+        bytes_ratio: 2.0, avg_duration_ms: 100, avg_pkts_per_sec: 10,
+        tcp_pct: 0.8, udp_pct: 0.2, icmp_pct: 0.0,
+        well_known_pct: 0.5, registered_pct: 0.3, ephemeral_pct: 0.2,
+      },
+      {
+        state_id: 1, flow_count: 6, avg_in_bytes: 2048, avg_out_bytes: 1024,
+        bytes_ratio: 2.0, avg_duration_ms: 200, avg_pkts_per_sec: 20,
+        tcp_pct: 0.9, udp_pct: 0.1, icmp_pct: 0.0,
+        well_known_pct: 0.7, registered_pct: 0.2, ephemeral_pct: 0.1,
+      },
+    ])
+    vi.mocked(scoreAnomalies).mockReturnValue([
+      { stateId: 0, anomalyScore: 0, anomalyFactors: [] },
+      { stateId: 1, anomalyScore: 0, anomalyFactors: [] },
+    ])
+
+    await discoverStates({
+      requestedStates: 2,
+      sampleSize: 50000,
+      onProgress: vi.fn(),
+    })
+
+    // Assert: trainInWorker received a matrix with 16 columns per row
+    const trainCall = vi.mocked(trainInWorker).mock.calls[0]
+    const matrix = trainCall[0] as number[][]
+    expect(matrix[0]).toHaveLength(16)
+    // Verify new features are at indices 12-15
+    expect(matrix[0][12]).toBe(1)   // is_conn_complete
+    expect(matrix[0][13]).toBe(0)   // is_conn_rejected
+    expect(matrix[0][14]).toBe(5.3) // log1p_bytes_per_pkt
+    expect(matrix[0][15]).toBe(3.2) // log1p_inter_flow_gap
+  })
+
   it('should return converged/iterations/logLikelihood from worker', async () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 10 }, (_, i) => ({
@@ -569,6 +664,10 @@ describe('discoverStates', () => {
       is_udp: 0,
       is_icmp: 0,
       port_category: 0,
+      is_conn_complete: 1,
+      is_conn_rejected: 0,
+      log1p_bytes_per_pkt: 4.5,
+      log1p_inter_flow_gap: 2.0,
     }))
 
     vi.mocked(ensureHmmStateColumn).mockResolvedValue(undefined)

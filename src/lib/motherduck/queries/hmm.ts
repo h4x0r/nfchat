@@ -14,7 +14,7 @@ import type { FlowRecord } from '../../schema';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Row returned by extractFeatures — 12 engineered features per flow. */
+/** Row returned by extractFeatures — 16 engineered features per flow. */
 export interface FlowFeatureRow {
   rowid: number;
   dst_ip: string;
@@ -30,6 +30,10 @@ export interface FlowFeatureRow {
   is_udp: number;
   is_icmp: number;
   port_category: number;
+  is_conn_complete: number;
+  is_conn_rejected: number;
+  log1p_bytes_per_pkt: number;
+  log1p_inter_flow_gap: number;
 }
 
 /** Aggregate signature for a single HMM state. */
@@ -104,10 +108,11 @@ const BATCH_SIZE = 1000;
 // ---------------------------------------------------------------------------
 
 /**
- * Extract the 12 HMM features per flow using SQL.
+ * Extract the 16 HMM features per flow using SQL.
  *
  * Features include log-transformed byte/packet counts, duration, IAT,
- * byte ratio, packets-per-second, protocol one-hot, and port category.
+ * byte ratio, packets-per-second, protocol one-hot, port category,
+ * connection state indicators, bytes-per-packet, and inter-flow gap.
  *
  * Uses a simple LIMIT query for speed on MotherDuck (cloud DuckDB).
  * Per-destination grouping and filtering (>= 3 flows per IP) is done
@@ -137,7 +142,15 @@ export async function extractFeatures(
       CASE WHEN PROTOCOL = 6 THEN 1 ELSE 0 END as is_tcp,
       CASE WHEN PROTOCOL = 17 THEN 1 ELSE 0 END as is_udp,
       CASE WHEN PROTOCOL = 1 THEN 1 ELSE 0 END as is_icmp,
-      CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category
+      CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category,
+      CASE WHEN CONN_STATE = 'SF' THEN 1 ELSE 0 END as is_conn_complete,
+      CASE WHEN CONN_STATE IN ('REJ','RSTO','RSTR','S0') THEN 1 ELSE 0 END as is_conn_rejected,
+      LN(1 + CAST(IN_BYTES + OUT_BYTES AS DOUBLE) / GREATEST(IN_PKTS + OUT_PKTS, 1)) as log1p_bytes_per_pkt,
+      LN(1 + COALESCE(
+        FLOW_START_MILLISECONDS - LAG(FLOW_START_MILLISECONDS) OVER (
+          PARTITION BY IPV4_DST_ADDR ORDER BY FLOW_START_MILLISECONDS
+        ), 0
+      )) as log1p_inter_flow_gap
     FROM flows
     ${limitClause}
   `);
