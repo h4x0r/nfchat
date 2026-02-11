@@ -3,8 +3,8 @@ import { extractFlowFeatures, StandardScaler, FEATURE_NAMES } from '../features'
 import type { FlowFeatures } from '../features'
 
 describe('FEATURE_NAMES', () => {
-  it('has exactly 16 feature names', () => {
-    expect(FEATURE_NAMES).toHaveLength(16)
+  it('has exactly 17 feature names', () => {
+    expect(FEATURE_NAMES).toHaveLength(17)
   })
 
   it('contains expected feature names', () => {
@@ -13,6 +13,7 @@ describe('FEATURE_NAMES', () => {
     expect(FEATURE_NAMES).toContain('is_tcp')
     expect(FEATURE_NAMES).toContain('port_category')
     expect(FEATURE_NAMES).toContain('is_conn_complete')
+    expect(FEATURE_NAMES).toContain('is_conn_no_reply')
     expect(FEATURE_NAMES).toContain('is_conn_rejected')
     expect(FEATURE_NAMES).toContain('log1p_bytes_per_pkt')
     expect(FEATURE_NAMES).toContain('log1p_inter_flow_gap')
@@ -30,9 +31,9 @@ describe('extractFlowFeatures', () => {
     L4_DST_PORT: 443,
   }
 
-  it('returns an array of 16 features', () => {
+  it('returns an array of 17 features', () => {
     const features = extractFlowFeatures(baseFlow)
-    expect(features).toHaveLength(16)
+    expect(features).toHaveLength(17)
   })
 
   it('computes log1p_in_bytes correctly', () => {
@@ -184,52 +185,71 @@ describe('extractFlowFeatures', () => {
     expect(features[12]).toBe(0)
   })
 
-  it('sets is_conn_rejected=1 when CONN_STATE is S0', () => {
+  it('sets is_conn_no_reply=1 when CONN_STATE is S0', () => {
     const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'S0' }
     const features = extractFlowFeatures(flow)
     expect(features[13]).toBe(1)
   })
 
-  it('sets is_conn_rejected=1 when CONN_STATE is REJ', () => {
-    const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'REJ' }
-    const features = extractFlowFeatures(flow)
-    expect(features[13]).toBe(1)
-  })
-
-  it('sets is_conn_rejected=0 when CONN_STATE is SF', () => {
+  it('sets is_conn_no_reply=0 when CONN_STATE is SF', () => {
     const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'SF' }
     const features = extractFlowFeatures(flow)
     expect(features[13]).toBe(0)
   })
 
+  it('sets is_conn_rejected=1 when CONN_STATE is REJ', () => {
+    const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'REJ' }
+    const features = extractFlowFeatures(flow)
+    expect(features[14]).toBe(1)
+  })
+
+  it('sets is_conn_rejected=1 when CONN_STATE is RSTO', () => {
+    const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'RSTO' }
+    const features = extractFlowFeatures(flow)
+    expect(features[14]).toBe(1)
+  })
+
+  it('sets is_conn_rejected=0 when CONN_STATE is S0', () => {
+    const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'S0' }
+    const features = extractFlowFeatures(flow)
+    expect(features[14]).toBe(0)
+  })
+
+  it('sets is_conn_rejected=0 when CONN_STATE is SF', () => {
+    const flow: FlowFeatures = { ...baseFlow, CONN_STATE: 'SF' }
+    const features = extractFlowFeatures(flow)
+    expect(features[14]).toBe(0)
+  })
+
   it('computes log1p_bytes_per_pkt correctly', () => {
     // (1000 + 500) / max(10 + 5, 1) = 1500 / 15 = 100
     const features = extractFlowFeatures(baseFlow)
-    expect(features[14]).toBeCloseTo(Math.log1p(100), 10)
+    expect(features[15]).toBeCloseTo(Math.log1p(100), 10)
   })
 
   it('handles zero packets in log1p_bytes_per_pkt', () => {
     const flow: FlowFeatures = { ...baseFlow, IN_PKTS: 0, OUT_PKTS: 0 }
     const features = extractFlowFeatures(flow)
     // (1000 + 500) / max(0, 1) = 1500
-    expect(features[14]).toBeCloseTo(Math.log1p(1500), 10)
+    expect(features[15]).toBeCloseTo(Math.log1p(1500), 10)
   })
 
   it('defaults log1p_inter_flow_gap to 0 when not provided', () => {
     const features = extractFlowFeatures(baseFlow)
-    expect(features[15]).toBeCloseTo(0, 10)
+    expect(features[16]).toBeCloseTo(0, 10)
   })
 
   it('computes log1p_inter_flow_gap when INTER_FLOW_GAP_MS is provided', () => {
     const flow: FlowFeatures = { ...baseFlow, INTER_FLOW_GAP_MS: 5000 }
     const features = extractFlowFeatures(flow)
-    expect(features[15]).toBeCloseTo(Math.log1p(5000), 10)
+    expect(features[16]).toBeCloseTo(Math.log1p(5000), 10)
   })
 
-  it('defaults is_conn_complete and is_conn_rejected to 0 when CONN_STATE not provided', () => {
+  it('defaults all conn features to 0 when CONN_STATE not provided', () => {
     const features = extractFlowFeatures(baseFlow)
     expect(features[12]).toBe(0)
     expect(features[13]).toBe(0)
+    expect(features[14]).toBe(0)
   })
 })
 

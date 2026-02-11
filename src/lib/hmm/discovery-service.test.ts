@@ -54,6 +54,7 @@ describe('discoverStates', () => {
       is_icmp: Math.random() > 0.5 ? 1 : 0,
       port_category: Math.floor(Math.random() * 3),
       is_conn_complete: Math.random() > 0.5 ? 1 : 0,
+      is_conn_no_reply: Math.random() > 0.9 ? 1 : 0,
       is_conn_rejected: Math.random() > 0.8 ? 1 : 0,
       log1p_bytes_per_pkt: 4.0 + Math.random(),
       log1p_inter_flow_gap: 2.0 + Math.random(),
@@ -205,6 +206,7 @@ describe('discoverStates', () => {
         is_icmp: 0,
         port_category: 0,
         is_conn_complete: 1,
+        is_conn_no_reply: 0,
         is_conn_rejected: 0,
         log1p_bytes_per_pkt: 4.5,
         log1p_inter_flow_gap: 0,
@@ -225,6 +227,7 @@ describe('discoverStates', () => {
         is_icmp: 0,
         port_category: 0,
         is_conn_complete: 1,
+        is_conn_no_reply: 0,
         is_conn_rejected: 0,
         log1p_bytes_per_pkt: 4.6,
         log1p_inter_flow_gap: 2.1,
@@ -264,6 +267,7 @@ describe('discoverStates', () => {
       is_icmp: 0,
       port_category: 0,
       is_conn_complete: 1,
+      is_conn_no_reply: 0,
       is_conn_rejected: 0,
       log1p_bytes_per_pkt: 4.5,
       log1p_inter_flow_gap: 2.0,
@@ -345,6 +349,7 @@ describe('discoverStates', () => {
       is_icmp: 0,
       port_category: 0,
       is_conn_complete: 1,
+      is_conn_no_reply: 0,
       is_conn_rejected: 0,
       log1p_bytes_per_pkt: 4.5,
       log1p_inter_flow_gap: 2.0,
@@ -453,6 +458,7 @@ describe('discoverStates', () => {
       is_icmp: 0,
       port_category: 0,
       is_conn_complete: 1,
+      is_conn_no_reply: 0,
       is_conn_rejected: 0,
       log1p_bytes_per_pkt: 4.5,
       log1p_inter_flow_gap: 2.0,
@@ -529,7 +535,7 @@ describe('discoverStates', () => {
         log1p_out_pkts: 2.5, log1p_duration_ms: 6.0, log1p_iat_avg: 4.5,
         bytes_ratio: 1.2, pkts_per_second: 10.0,
         is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0,
-        is_conn_complete: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 4.5, log1p_inter_flow_gap: 2.0,
+        is_conn_complete: 1, is_conn_no_reply: 0, is_conn_rejected: 0, log1p_bytes_per_pkt: 4.5, log1p_inter_flow_gap: 2.0,
       })),
       ...Array.from({ length: 5 }, (_, i) => ({
         rowid: i + 5,
@@ -538,7 +544,7 @@ describe('discoverStates', () => {
         log1p_out_pkts: 4.5, log1p_duration_ms: 9.0, log1p_iat_avg: 6.5,
         bytes_ratio: 2.2, pkts_per_second: 20.0,
         is_tcp: 0, is_udp: 1, is_icmp: 0, port_category: 1,
-        is_conn_complete: 0, is_conn_rejected: 1, log1p_bytes_per_pkt: 6.2, log1p_inter_flow_gap: 3.5,
+        is_conn_complete: 0, is_conn_no_reply: 0, is_conn_rejected: 1, log1p_bytes_per_pkt: 6.2, log1p_inter_flow_gap: 3.5,
       })),
     ]
 
@@ -578,7 +584,7 @@ describe('discoverStates', () => {
     ])
   })
 
-  it('should build 16-element feature matrix rows from FlowFeatureRow', async () => {
+  it('should build 17-element feature matrix rows from FlowFeatureRow', async () => {
     // Arrange
     const mockFeatureRows = Array.from({ length: 12 }, (_, i) => ({
       rowid: i,
@@ -596,6 +602,7 @@ describe('discoverStates', () => {
       is_icmp: 0,
       port_category: 0,
       is_conn_complete: 1,
+      is_conn_no_reply: 0,
       is_conn_rejected: 0,
       log1p_bytes_per_pkt: 5.3,
       log1p_inter_flow_gap: 3.2,
@@ -636,15 +643,16 @@ describe('discoverStates', () => {
       onProgress: vi.fn(),
     })
 
-    // Assert: trainInWorker received a matrix with 16 columns per row
+    // Assert: trainInWorker received a matrix with 17 columns per row
     const trainCall = vi.mocked(trainInWorker).mock.calls[0]
     const matrix = trainCall[0] as number[][]
-    expect(matrix[0]).toHaveLength(16)
-    // Verify new features are at indices 12-15
+    expect(matrix[0]).toHaveLength(17)
+    // Verify new features are at indices 12-16
     expect(matrix[0][12]).toBe(1)   // is_conn_complete
-    expect(matrix[0][13]).toBe(0)   // is_conn_rejected
-    expect(matrix[0][14]).toBe(5.3) // log1p_bytes_per_pkt
-    expect(matrix[0][15]).toBe(3.2) // log1p_inter_flow_gap
+    expect(matrix[0][13]).toBe(0)   // is_conn_no_reply
+    expect(matrix[0][14]).toBe(0)   // is_conn_rejected
+    expect(matrix[0][15]).toBe(5.3) // log1p_bytes_per_pkt
+    expect(matrix[0][16]).toBe(3.2) // log1p_inter_flow_gap
   })
 
   it('should return converged/iterations/logLikelihood from worker', async () => {
@@ -665,6 +673,7 @@ describe('discoverStates', () => {
       is_icmp: 0,
       port_category: 0,
       is_conn_complete: 1,
+      is_conn_no_reply: 0,
       is_conn_rejected: 0,
       log1p_bytes_per_pkt: 4.5,
       log1p_inter_flow_gap: 2.0,

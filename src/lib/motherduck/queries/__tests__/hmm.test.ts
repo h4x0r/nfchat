@@ -98,6 +98,7 @@ describe('HMM Query Module', () => {
         is_icmp: 0,
         port_category: 0,
         is_conn_complete: 1,
+        is_conn_no_reply: 0,
         is_conn_rejected: 0,
         log1p_bytes_per_pkt: 5.3,
         log1p_inter_flow_gap: 3.2,
@@ -117,11 +118,23 @@ describe('HMM Query Module', () => {
       expect(sql).toMatch(/CONN_STATE\s*=\s*'SF'/);
     });
 
-    it('generates SQL with is_conn_rejected column', async () => {
+    it('generates SQL with is_conn_no_reply column for S0', async () => {
+      await extractFeatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('is_conn_no_reply');
+      expect(sql).toMatch(/CONN_STATE\s*=\s*'S0'/);
+    });
+
+    it('generates SQL with is_conn_rejected column for REJ/RSTO/RSTR', async () => {
       await extractFeatures();
       const sql = mockExecuteQuery.mock.calls[0][0];
       expect(sql).toContain('is_conn_rejected');
       expect(sql).toMatch(/CONN_STATE\s+IN\s*\(/);
+      // S0 should NOT be in the rejected set
+      const rejMatch = sql.match(/is_conn_rejected[\s\S]*?CONN_STATE\s+IN\s*\(([^)]+)\)/);
+      if (rejMatch) {
+        expect(rejMatch[1]).not.toContain('S0');
+      }
     });
 
     it('generates SQL with log1p_bytes_per_pkt column', async () => {
@@ -148,12 +161,12 @@ describe('HMM Query Module', () => {
       // Provide mock data with mixed IPs — some with >= 3 flows, some with fewer
       const mockRows: FlowFeatureRow[] = [
         // IP with 3 flows (should be kept)
-        { rowid: 1, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 0 },
-        { rowid: 2, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 2.3 },
-        { rowid: 3, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 2.1 },
+        { rowid: 1, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_no_reply: 0, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 0 },
+        { rowid: 2, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_no_reply: 0, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 2.3 },
+        { rowid: 3, dst_ip: '10.0.0.1', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 1, is_conn_no_reply: 0, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 2.1 },
         // IP with 2 flows (should be filtered out)
-        { rowid: 4, dst_ip: '10.0.0.2', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 0, is_conn_rejected: 1, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 0 },
-        { rowid: 5, dst_ip: '10.0.0.2', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 0, is_conn_rejected: 1, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 1.5 },
+        { rowid: 4, dst_ip: '10.0.0.2', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 0, is_conn_no_reply: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 0 },
+        { rowid: 5, dst_ip: '10.0.0.2', log1p_in_bytes: 1, log1p_out_bytes: 1, log1p_in_pkts: 1, log1p_out_pkts: 1, log1p_duration_ms: 1, log1p_iat_avg: 1, bytes_ratio: 1, pkts_per_second: 1, is_tcp: 1, is_udp: 0, is_icmp: 0, port_category: 0, is_conn_complete: 0, is_conn_no_reply: 1, is_conn_rejected: 0, log1p_bytes_per_pkt: 1, log1p_inter_flow_gap: 1.5 },
       ];
       mockExecuteQuery.mockResolvedValueOnce(mockRows);
 
@@ -472,6 +485,7 @@ describe('HMM Query Module', () => {
         is_icmp: 0,
         port_category: 0,
         is_conn_complete: 0,
+        is_conn_no_reply: 0,
         is_conn_rejected: 0,
         log1p_bytes_per_pkt: 0,
         log1p_inter_flow_gap: 0,

@@ -14,7 +14,7 @@ import type { FlowRecord } from '../../schema';
 // Types
 // ---------------------------------------------------------------------------
 
-/** Row returned by extractFeatures — 16 engineered features per flow. */
+/** Row returned by extractFeatures — 17 engineered features per flow. */
 export interface FlowFeatureRow {
   rowid: number;
   dst_ip: string;
@@ -31,6 +31,7 @@ export interface FlowFeatureRow {
   is_icmp: number;
   port_category: number;
   is_conn_complete: number;
+  is_conn_no_reply: number;
   is_conn_rejected: number;
   log1p_bytes_per_pkt: number;
   log1p_inter_flow_gap: number;
@@ -144,7 +145,8 @@ export async function extractFeatures(
       CASE WHEN PROTOCOL = 1 THEN 1 ELSE 0 END as is_icmp,
       CASE WHEN L4_DST_PORT <= 1023 THEN 0 WHEN L4_DST_PORT <= 49151 THEN 1 ELSE 2 END as port_category,
       CASE WHEN CONN_STATE = 'SF' THEN 1 ELSE 0 END as is_conn_complete,
-      CASE WHEN CONN_STATE IN ('REJ','RSTO','RSTR','S0') THEN 1 ELSE 0 END as is_conn_rejected,
+      CASE WHEN CONN_STATE = 'S0' THEN 1 ELSE 0 END as is_conn_no_reply,
+      CASE WHEN CONN_STATE IN ('REJ','RSTO','RSTR') THEN 1 ELSE 0 END as is_conn_rejected,
       LN(1 + CAST(IN_BYTES + OUT_BYTES AS DOUBLE) / GREATEST(IN_PKTS + OUT_PKTS, 1)) as log1p_bytes_per_pkt,
       LN(1 + COALESCE(
         FLOW_START_MILLISECONDS - LAG(FLOW_START_MILLISECONDS) OVER (

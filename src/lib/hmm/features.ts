@@ -19,6 +19,7 @@ export const FEATURE_NAMES = [
   'is_icmp',
   'port_category',
   'is_conn_complete',
+  'is_conn_no_reply',
   'is_conn_rejected',
   'log1p_bytes_per_pkt',
   'log1p_inter_flow_gap',
@@ -44,11 +45,11 @@ const PROTO_TCP = 6
 const PROTO_UDP = 17
 const PROTO_ICMP = 1
 
-// Connection states indicating rejected/failed/scan flows
-const REJECTED_STATES = new Set(['REJ', 'RSTO', 'RSTR', 'S0'])
+// Connection states indicating active rejection/reset (not S0 which is no-reply)
+const REJECTED_STATES = new Set(['REJ', 'RSTO', 'RSTR'])
 
 /**
- * Extract 16 numeric features from a single network flow.
+ * Extract 17 numeric features from a single network flow.
  *
  * Feature order matches FEATURE_NAMES:
  *  [0] log1p_in_bytes
@@ -64,12 +65,13 @@ const REJECTED_STATES = new Set(['REJ', 'RSTO', 'RSTR', 'S0'])
  * [10] is_icmp
  * [11] port_category
  * [12] is_conn_complete
- * [13] is_conn_rejected
- * [14] log1p_bytes_per_pkt
- * [15] log1p_inter_flow_gap
+ * [13] is_conn_no_reply
+ * [14] is_conn_rejected
+ * [15] log1p_bytes_per_pkt
+ * [16] log1p_inter_flow_gap
  */
 export function extractFlowFeatures(flow: FlowFeatures): number[] {
-  const features = new Array<number>(16)
+  const features = new Array<number>(17)
 
   // Volume features (log-scaled)
   features[0] = Math.log1p(flow.IN_BYTES)
@@ -100,14 +102,15 @@ export function extractFlowFeatures(flow: FlowFeatures): number[] {
   // Connection state indicators
   const connState = flow.CONN_STATE ?? ''
   features[12] = connState === 'SF' ? 1 : 0
-  features[13] = REJECTED_STATES.has(connState) ? 1 : 0
+  features[13] = connState === 'S0' ? 1 : 0
+  features[14] = REJECTED_STATES.has(connState) ? 1 : 0
 
   // Bytes per packet (log-scaled)
   const totalBytes = flow.IN_BYTES + flow.OUT_BYTES
-  features[14] = Math.log1p(totalBytes / Math.max(totalPkts, 1))
+  features[15] = Math.log1p(totalBytes / Math.max(totalPkts, 1))
 
   // Inter-flow gap (log-scaled, defaults to 0 if not provided)
-  features[15] = Math.log1p(flow.INTER_FLOW_GAP_MS ?? 0)
+  features[16] = Math.log1p(flow.INTER_FLOW_GAP_MS ?? 0)
 
   return features
 }
