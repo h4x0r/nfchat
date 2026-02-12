@@ -134,6 +134,11 @@ export interface StateProfile {
   avgPktsPerSec: number
   protocolDist: { tcp: number; udp: number; icmp: number }
   portCategoryDist: { wellKnown: number; registered: number; ephemeral: number }
+  connCompletePct?: number
+  noReplyPct?: number
+  rejectedPct?: number
+  avgBytesPerPkt?: number
+  avgInterFlowGapMs?: number
   anomalyScore?: number
   anomalyFactors?: string[]
 }

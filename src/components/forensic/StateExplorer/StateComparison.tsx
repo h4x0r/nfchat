@@ -51,11 +51,22 @@ interface MetricRowProps {
 
 function MetricRow({ label, value1, value2, delta, redIsHigher }: MetricRowProps) {
   return (
-    <div className="flex items-center gap-2 text-xs py-1 border-b border-border">
-      <span className="w-24 text-muted-foreground">{label}</span>
-      <span className="w-20 font-mono text-right">{value1}</span>
-      <DeltaIndicator delta={delta} redIsHigher={redIsHigher} />
-      <span className="w-20 font-mono text-right">{value2}</span>
+    <div className="grid grid-cols-[1fr_1fr_auto_1fr] items-center gap-2 text-xs py-1 border-b border-border">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-right">{value1}</span>
+      <span className="w-16 text-center"><DeltaIndicator delta={delta} redIsHigher={redIsHigher} /></span>
+      <span className="font-mono text-right">{value2}</span>
+    </div>
+  )
+}
+
+function PctRow({ label, pct1, pct2 }: { label: string; pct1: number; pct2: number }) {
+  return (
+    <div className="grid grid-cols-[1fr_1fr_auto_1fr] items-center gap-2 text-xs py-1 border-b border-border">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="font-mono text-right">{Math.round(pct1 * 100)}%</span>
+      <span className="w-16" />
+      <span className="font-mono text-right">{Math.round(pct2 * 100)}%</span>
     </div>
   )
 }
@@ -68,19 +79,26 @@ export const StateComparison = memo(function StateComparison({
   const outBytesDelta = calculateDelta(state2.avgOutBytes, state1.avgOutBytes)
   const durationDelta = calculateDelta(state2.avgDurationMs, state1.avgDurationMs)
   const pktsDelta = calculateDelta(state2.avgPktsPerSec, state1.avgPktsPerSec)
+  const bppDelta = (state1.avgBytesPerPkt != null && state2.avgBytesPerPkt != null)
+    ? calculateDelta(state2.avgBytesPerPkt, state1.avgBytesPerPkt)
+    : null
+  const gapDelta = (state1.avgInterFlowGapMs != null && state2.avgInterFlowGapMs != null)
+    ? calculateDelta(state2.avgInterFlowGapMs, state1.avgInterFlowGapMs)
+    : null
 
   return (
     <div className="rounded-lg border border-border bg-card p-4">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex-1 text-center">
+      <div className="grid grid-cols-[1fr_1fr_auto_1fr] items-center gap-2 mb-4">
+        <div />
+        <div className="text-center">
           <span className="font-semibold text-sm">State {state1.stateId}</span>
           <div className="text-xs text-muted-foreground">
             {state1.flowCount.toLocaleString()} flows
           </div>
         </div>
-        <div className="px-3 text-muted-foreground">vs</div>
-        <div className="flex-1 text-center">
+        <div className="w-16 text-center text-muted-foreground text-xs">vs</div>
+        <div className="text-center">
           <span className="font-semibold text-sm">State {state2.stateId}</span>
           <div className="text-xs text-muted-foreground">
             {state2.flowCount.toLocaleString()} flows
@@ -88,111 +106,45 @@ export const StateComparison = memo(function StateComparison({
         </div>
       </div>
 
-      {/* Traffic Metrics */}
+      {/* Traffic Profile */}
       <div className="mb-3">
         <div className="text-xs font-medium text-muted-foreground mb-2">Traffic Profile</div>
-        <MetricRow
-          label="Avg In"
-          value1={formatBytes(state1.avgInBytes)}
-          value2={formatBytes(state2.avgInBytes)}
-          delta={inBytesDelta}
-        />
-        <MetricRow
-          label="Avg Out"
-          value1={formatBytes(state1.avgOutBytes)}
-          value2={formatBytes(state2.avgOutBytes)}
-          delta={outBytesDelta}
-        />
-        <MetricRow
-          label="Duration"
-          value1={formatDuration(state1.avgDurationMs)}
-          value2={formatDuration(state2.avgDurationMs)}
-          delta={durationDelta}
-        />
-        <MetricRow
-          label="Pkts/sec"
-          value1={state1.avgPktsPerSec.toFixed(1)}
-          value2={state2.avgPktsPerSec.toFixed(1)}
-          delta={pktsDelta}
-        />
+        <MetricRow label="Avg In" value1={formatBytes(state1.avgInBytes)} value2={formatBytes(state2.avgInBytes)} delta={inBytesDelta} />
+        <MetricRow label="Avg Out" value1={formatBytes(state1.avgOutBytes)} value2={formatBytes(state2.avgOutBytes)} delta={outBytesDelta} />
+        <MetricRow label="Duration" value1={formatDuration(state1.avgDurationMs)} value2={formatDuration(state2.avgDurationMs)} delta={durationDelta} />
+        <MetricRow label="Pkts/sec" value1={state1.avgPktsPerSec.toFixed(1)} value2={state2.avgPktsPerSec.toFixed(1)} delta={pktsDelta} />
+        {state1.avgBytesPerPkt != null && state2.avgBytesPerPkt != null && (
+          <MetricRow label="Bytes/pkt" value1={state1.avgBytesPerPkt.toFixed(1)} value2={state2.avgBytesPerPkt.toFixed(1)} delta={bppDelta} />
+        )}
+        {state1.avgInterFlowGapMs != null && state2.avgInterFlowGapMs != null && (
+          <MetricRow label="Flow gap" value1={formatDuration(state1.avgInterFlowGapMs)} value2={formatDuration(state2.avgInterFlowGapMs)} delta={gapDelta} />
+        )}
       </div>
+
+      {/* Connection States */}
+      {state1.connCompletePct != null && state2.connCompletePct != null && (
+        <div className="mb-3">
+          <div className="text-xs font-medium text-muted-foreground mb-2">Connection States</div>
+          <PctRow label="Complete (SF)" pct1={state1.connCompletePct} pct2={state2.connCompletePct} />
+          <PctRow label="No Reply (S0)" pct1={state1.noReplyPct ?? 0} pct2={state2.noReplyPct ?? 0} />
+          <PctRow label="Rejected" pct1={state1.rejectedPct ?? 0} pct2={state2.rejectedPct ?? 0} />
+        </div>
+      )}
 
       {/* Protocol Distribution */}
       <div className="mb-3">
         <div className="text-xs font-medium text-muted-foreground mb-2">Protocol Distribution</div>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">TCP</span>
-                <span className="font-mono">{Math.round(state1.protocolDist.tcp * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">UDP</span>
-                <span className="font-mono">{Math.round(state1.protocolDist.udp * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ICMP</span>
-                <span className="font-mono">{Math.round(state1.protocolDist.icmp * 100)}%</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">TCP</span>
-                <span className="font-mono">{Math.round(state2.protocolDist.tcp * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">UDP</span>
-                <span className="font-mono">{Math.round(state2.protocolDist.udp * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">ICMP</span>
-                <span className="font-mono">{Math.round(state2.protocolDist.icmp * 100)}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PctRow label="TCP" pct1={state1.protocolDist.tcp} pct2={state2.protocolDist.tcp} />
+        <PctRow label="UDP" pct1={state1.protocolDist.udp} pct2={state2.protocolDist.udp} />
+        <PctRow label="ICMP" pct1={state1.protocolDist.icmp} pct2={state2.protocolDist.icmp} />
       </div>
 
       {/* Port Category Distribution */}
       <div>
         <div className="text-xs font-medium text-muted-foreground mb-2">Port Categories</div>
-        <div className="grid grid-cols-2 gap-3 text-xs">
-          <div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Well-known</span>
-                <span className="font-mono">{Math.round(state1.portCategoryDist.wellKnown * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Registered</span>
-                <span className="font-mono">{Math.round(state1.portCategoryDist.registered * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ephemeral</span>
-                <span className="font-mono">{Math.round(state1.portCategoryDist.ephemeral * 100)}%</span>
-              </div>
-            </div>
-          </div>
-          <div>
-            <div className="space-y-1">
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Well-known</span>
-                <span className="font-mono">{Math.round(state2.portCategoryDist.wellKnown * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Registered</span>
-                <span className="font-mono">{Math.round(state2.portCategoryDist.registered * 100)}%</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">Ephemeral</span>
-                <span className="font-mono">{Math.round(state2.portCategoryDist.ephemeral * 100)}%</span>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PctRow label="Well-known" pct1={state1.portCategoryDist.wellKnown} pct2={state2.portCategoryDist.wellKnown} />
+        <PctRow label="Registered" pct1={state1.portCategoryDist.registered} pct2={state2.portCategoryDist.registered} />
+        <PctRow label="Ephemeral" pct1={state1.portCategoryDist.ephemeral} pct2={state2.portCategoryDist.ephemeral} />
       </div>
     </div>
   )

@@ -52,6 +52,11 @@ export interface StateSignatureRow {
   well_known_pct: number;
   registered_pct: number;
   ephemeral_pct: number;
+  conn_complete_pct: number;
+  no_reply_pct: number;
+  rejected_pct: number;
+  avg_bytes_per_pkt: number;
+  avg_inter_flow_gap_ms: number;
 }
 
 /** IP address with occurrence count. */
@@ -190,6 +195,14 @@ export async function extractFeatures(
  */
 export async function getStateSignatures(): Promise<StateSignatureRow[]> {
   return executeQuery<StateSignatureRow>(`
+    WITH flow_gaps AS (
+      SELECT *,
+        FLOW_START_MILLISECONDS - LAG(FLOW_START_MILLISECONDS) OVER (
+          PARTITION BY IPV4_DST_ADDR ORDER BY FLOW_START_MILLISECONDS
+        ) AS inter_flow_gap_ms
+      FROM flows
+      WHERE HMM_STATE IS NOT NULL
+    )
     SELECT
       HMM_STATE as state_id,
       COUNT(*) as flow_count,
@@ -203,9 +216,13 @@ export async function getStateSignatures(): Promise<StateSignatureRow[]> {
       COUNT(CASE WHEN PROTOCOL = 1 THEN 1 END)::DOUBLE / COUNT(*) as icmp_pct,
       COUNT(CASE WHEN L4_DST_PORT <= 1023 THEN 1 END)::DOUBLE / COUNT(*) as well_known_pct,
       COUNT(CASE WHEN L4_DST_PORT BETWEEN 1024 AND 49151 THEN 1 END)::DOUBLE / COUNT(*) as registered_pct,
-      COUNT(CASE WHEN L4_DST_PORT >= 49152 THEN 1 END)::DOUBLE / COUNT(*) as ephemeral_pct
-    FROM flows
-    WHERE HMM_STATE IS NOT NULL
+      COUNT(CASE WHEN L4_DST_PORT >= 49152 THEN 1 END)::DOUBLE / COUNT(*) as ephemeral_pct,
+      COUNT(CASE WHEN CONN_STATE = 'SF' THEN 1 END)::DOUBLE / COUNT(*) as conn_complete_pct,
+      COUNT(CASE WHEN CONN_STATE = 'S0' THEN 1 END)::DOUBLE / COUNT(*) as no_reply_pct,
+      COUNT(CASE WHEN CONN_STATE IN ('REJ','RSTO','RSTR') THEN 1 END)::DOUBLE / COUNT(*) as rejected_pct,
+      AVG(CAST(IN_BYTES + OUT_BYTES AS DOUBLE) / GREATEST(IN_PKTS + OUT_PKTS, 1)) as avg_bytes_per_pkt,
+      AVG(COALESCE(inter_flow_gap_ms, 0)) as avg_inter_flow_gap_ms
+    FROM flow_gaps
     GROUP BY HMM_STATE
     ORDER BY HMM_STATE
   `);

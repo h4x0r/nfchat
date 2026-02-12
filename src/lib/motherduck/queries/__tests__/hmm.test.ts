@@ -199,6 +199,39 @@ describe('HMM Query Module', () => {
       expect(sql).toContain('GROUP BY HMM_STATE');
       expect(sql).toContain('ORDER BY HMM_STATE');
     });
+
+    it('includes conn_complete_pct aggregate for SF connection state', async () => {
+      await getStateSignatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('conn_complete_pct');
+      expect(sql).toMatch(/CONN_STATE\s*=\s*'SF'/);
+    });
+
+    it('includes no_reply_pct aggregate for S0 connection state', async () => {
+      await getStateSignatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('no_reply_pct');
+      expect(sql).toMatch(/CONN_STATE\s*=\s*'S0'/);
+    });
+
+    it('includes rejected_pct aggregate for REJ/RSTO/RSTR connection states', async () => {
+      await getStateSignatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('rejected_pct');
+      expect(sql).toMatch(/CONN_STATE\s+IN\s*\('REJ'/);
+    });
+
+    it('includes avg_bytes_per_pkt aggregate', async () => {
+      await getStateSignatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('avg_bytes_per_pkt');
+    });
+
+    it('includes avg_inter_flow_gap_ms aggregate using LAG window', async () => {
+      await getStateSignatures();
+      const sql = mockExecuteQuery.mock.calls[0][0];
+      expect(sql).toContain('avg_inter_flow_gap_ms');
+    });
   });
 
   describe('getSampleFlows', () => {
@@ -506,6 +539,11 @@ describe('HMM Query Module', () => {
         well_known_pct: 0,
         registered_pct: 0,
         ephemeral_pct: 0,
+        conn_complete_pct: 0,
+        no_reply_pct: 0,
+        rejected_pct: 0,
+        avg_bytes_per_pkt: 0,
+        avg_inter_flow_gap_ms: 0,
       };
       expect(sig).toBeDefined();
 

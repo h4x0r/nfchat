@@ -123,7 +123,38 @@ export const StateCard = memo(function StateCard({
           <div className="text-muted-foreground">Duration</div>
           <div className="font-mono font-medium">{formatDuration(state.avgDurationMs)}</div>
         </div>
+        {state.avgBytesPerPkt != null && (
+          <div>
+            <div className="text-muted-foreground">Bytes/pkt</div>
+            <div className="font-mono font-medium">{state.avgBytesPerPkt.toFixed(0)}</div>
+          </div>
+        )}
+        {state.avgInterFlowGapMs != null && (
+          <div>
+            <div className="text-muted-foreground">Flow gap</div>
+            <div className="font-mono font-medium">{formatDuration(state.avgInterFlowGapMs)}</div>
+          </div>
+        )}
       </div>
+
+      {/* Connection State Indicators */}
+      {state.connCompletePct != null && (
+        <div className="flex gap-3 mb-3 text-xs">
+          <span className="px-1.5 py-0.5 rounded bg-green-500/10 text-green-700 dark:text-green-400 font-mono">
+            SF {Math.round(state.connCompletePct * 100)}%
+          </span>
+          {(state.noReplyPct ?? 0) > 0.01 && (
+            <span className="px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-700 dark:text-yellow-400 font-mono">
+              S0 {Math.round((state.noReplyPct ?? 0) * 100)}%
+            </span>
+          )}
+          {(state.rejectedPct ?? 0) > 0.01 && (
+            <span className="px-1.5 py-0.5 rounded bg-red-500/10 text-red-700 dark:text-red-400 font-mono">
+              REJ {Math.round((state.rejectedPct ?? 0) * 100)}%
+            </span>
+          )}
+        </div>
+      )}
 
       {/* Protocol Distribution */}
       <div className="space-y-1 mb-3">

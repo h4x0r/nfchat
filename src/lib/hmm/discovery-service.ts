@@ -113,6 +113,11 @@ export async function discoverStates(opts: DiscoveryOptions): Promise<DiscoveryR
     avgPktsPerSec: sig.avg_pkts_per_sec,
     protocolDist: { tcp: sig.tcp_pct, udp: sig.udp_pct, icmp: sig.icmp_pct },
     portCategoryDist: { wellKnown: sig.well_known_pct, registered: sig.registered_pct, ephemeral: sig.ephemeral_pct },
+    connCompletePct: sig.conn_complete_pct,
+    noReplyPct: sig.no_reply_pct,
+    rejectedPct: sig.rejected_pct,
+    avgBytesPerPkt: sig.avg_bytes_per_pkt,
+    avgInterFlowGapMs: sig.avg_inter_flow_gap_ms,
   }))
 
   // CRITICAL: Score anomalies and merge into profiles

@@ -90,6 +90,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.5,
         registered_pct: 0.3,
         ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7,
+        no_reply_pct: 0.1,
+        rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4,
+        avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1,
@@ -105,6 +110,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.7,
         registered_pct: 0.2,
         ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85,
+        no_reply_pct: 0.05,
+        rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8,
+        avg_inter_flow_gap_ms: 2000,
       },
       {
         state_id: 2,
@@ -120,6 +130,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.3,
         registered_pct: 0.4,
         ephemeral_pct: 0.3,
+        conn_complete_pct: 0.5,
+        no_reply_pct: 0.2,
+        rejected_pct: 0.1,
+        avg_bytes_per_pkt: 51.2,
+        avg_inter_flow_gap_ms: 800,
       },
       {
         state_id: 3,
@@ -135,6 +150,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.9,
         registered_pct: 0.1,
         ephemeral_pct: 0.0,
+        conn_complete_pct: 0.95,
+        no_reply_pct: 0.02,
+        rejected_pct: 0.01,
+        avg_bytes_per_pkt: 409.6,
+        avg_inter_flow_gap_ms: 3000,
       },
     ]
 
@@ -298,6 +318,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.5,
         registered_pct: 0.3,
         ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7,
+        no_reply_pct: 0.1,
+        rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4,
+        avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1,
@@ -313,6 +338,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.7,
         registered_pct: 0.2,
         ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85,
+        no_reply_pct: 0.05,
+        rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8,
+        avg_inter_flow_gap_ms: 2000,
       },
     ])
     vi.mocked(scoreAnomalies).mockReturnValue([
@@ -380,6 +410,8 @@ describe('discoverStates', () => {
         well_known_pct: 0.5,
         registered_pct: 0.3,
         ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7, no_reply_pct: 0.1, rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4, avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1,
@@ -395,6 +427,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.7,
         registered_pct: 0.2,
         ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85,
+        no_reply_pct: 0.05,
+        rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8,
+        avg_inter_flow_gap_ms: 2000,
       },
       {
         state_id: 2,
@@ -410,6 +447,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.3,
         registered_pct: 0.4,
         ephemeral_pct: 0.3,
+        conn_complete_pct: 0.5,
+        no_reply_pct: 0.2,
+        rejected_pct: 0.1,
+        avg_bytes_per_pkt: 51.2,
+        avg_inter_flow_gap_ms: 800,
       },
     ])
     // Mock anomaly scores with different values
@@ -489,6 +531,8 @@ describe('discoverStates', () => {
         well_known_pct: 0.5,
         registered_pct: 0.3,
         ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7, no_reply_pct: 0.1, rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4, avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1,
@@ -504,6 +548,8 @@ describe('discoverStates', () => {
         well_known_pct: 0.7,
         registered_pct: 0.2,
         ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85, no_reply_pct: 0.05, rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8, avg_inter_flow_gap_ms: 2000,
       },
     ])
     vi.mocked(scoreAnomalies).mockReturnValue([
@@ -561,12 +607,16 @@ describe('discoverStates', () => {
         bytes_ratio: 2.0, avg_duration_ms: 100, avg_pkts_per_sec: 10,
         tcp_pct: 0.8, udp_pct: 0.2, icmp_pct: 0.0,
         well_known_pct: 0.5, registered_pct: 0.3, ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7, no_reply_pct: 0.1, rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4, avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1, flow_count: 5, avg_in_bytes: 2048, avg_out_bytes: 1024,
         bytes_ratio: 2.0, avg_duration_ms: 200, avg_pkts_per_sec: 20,
         tcp_pct: 0.9, udp_pct: 0.1, icmp_pct: 0.0,
         well_known_pct: 0.7, registered_pct: 0.2, ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85, no_reply_pct: 0.05, rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8, avg_inter_flow_gap_ms: 2000,
       },
     ])
     vi.mocked(scoreAnomalies).mockReturnValue([
@@ -624,12 +674,16 @@ describe('discoverStates', () => {
         bytes_ratio: 2.0, avg_duration_ms: 100, avg_pkts_per_sec: 10,
         tcp_pct: 0.8, udp_pct: 0.2, icmp_pct: 0.0,
         well_known_pct: 0.5, registered_pct: 0.3, ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7, no_reply_pct: 0.1, rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4, avg_inter_flow_gap_ms: 1500,
       },
       {
         state_id: 1, flow_count: 6, avg_in_bytes: 2048, avg_out_bytes: 1024,
         bytes_ratio: 2.0, avg_duration_ms: 200, avg_pkts_per_sec: 20,
         tcp_pct: 0.9, udp_pct: 0.1, icmp_pct: 0.0,
         well_known_pct: 0.7, registered_pct: 0.2, ephemeral_pct: 0.1,
+        conn_complete_pct: 0.85, no_reply_pct: 0.05, rejected_pct: 0.02,
+        avg_bytes_per_pkt: 204.8, avg_inter_flow_gap_ms: 2000,
       },
     ])
     vi.mocked(scoreAnomalies).mockReturnValue([
@@ -704,6 +758,11 @@ describe('discoverStates', () => {
         well_known_pct: 0.5,
         registered_pct: 0.3,
         ephemeral_pct: 0.2,
+        conn_complete_pct: 0.7,
+        no_reply_pct: 0.1,
+        rejected_pct: 0.05,
+        avg_bytes_per_pkt: 102.4,
+        avg_inter_flow_gap_ms: 1500,
       },
     ])
     vi.mocked(scoreAnomalies).mockReturnValue([
