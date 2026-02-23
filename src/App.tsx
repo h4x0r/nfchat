@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
-import { useNetflowData } from '@/hooks/useNetflowData'
+import { useNetflowData, type DataSource } from '@/hooks/useNetflowData'
 import { LandingPage, type CRTLogEntry } from '@/components/landing/LandingPage'
 import { CRTLoadingLog } from '@/components/landing/CRTLoadingLog'
 import { ErrorBoundary } from '@/components/error'
@@ -42,10 +42,14 @@ function DashboardLoadingFallback() {
 function App() {
   const [dataSource, setDataSource] = useState<DataSource>({ type: 'none' })
 
-  // Determine URL for useNetflowData
-  const loadUrl = dataSource.type === 'url' ? dataSource.url : ''
+  // Determine source for useNetflowData
+  const hookSource: DataSource = dataSource.type === 'url'
+    ? dataSource.url
+    : dataSource.type === 'file'
+      ? { type: 'file', file: dataSource.file }
+      : ''
 
-  const { loading, error, progress, logs } = useNetflowData(loadUrl)
+  const { loading, error, progress, logs } = useNetflowData(hookSource)
 
   // Convert logs to CRT format
   const crtLogs = useMemo((): CRTLogEntry[] => {
@@ -66,13 +70,7 @@ function App() {
         : source.url.split('/').pop() || 'data.parquet'
       setDataSource({ type: 'url', url: source.url, fileName })
     } else {
-      // TODO: Implement file upload handling
-      // For now, show a message that file upload is coming
-      setDataSource({
-        type: 'url',
-        url: DEMO_PARQUET_URL,
-        fileName: source.file.name + ' (using demo data - file upload coming soon)',
-      })
+      setDataSource({ type: 'file', file: source.file })
     }
   }, [])
 
@@ -95,7 +93,11 @@ function App() {
 
   // Loading state - CRT styled
   if (loading) {
-    const fileName = dataSource.type === 'url' ? dataSource.fileName : ''
+    const fileName = dataSource.type === 'url'
+      ? dataSource.fileName
+      : dataSource.type === 'file'
+        ? dataSource.file.name
+        : ''
 
     return (
       <div className="crt-container crt-scanlines min-h-screen flex flex-col items-center justify-center p-8">

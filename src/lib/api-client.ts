@@ -33,6 +33,15 @@ interface LoadResponse {
   error?: string | AppError
 }
 
+interface ProbeResponse {
+  success: boolean
+  rowCount: number
+  error?: string | AppError
+}
+
+const CHUNK_SIZE = 500_000
+const CHUNK_THRESHOLD = CHUNK_SIZE
+
 interface DashboardResponse {
   success: boolean
   data?: DashboardData
@@ -218,7 +227,12 @@ async function apiPost<T>(
 // ─────────────────────────────────────────────────────────────
 
 /**
- * Load parquet data from a URL via the backend.
+ * Load data from a URL via the backend, using chunked loading for large datasets.
+ *
+ * Protocol:
+ * 1. Probe: COUNT(*) to get total rows (fast — reads Parquet metadata only)
+ * 2. If <= 500K rows: single `load` action (existing behavior)
+ * 3. If > 500K rows: `create` first chunk + `append` remaining chunks
  */
 export async function loadDataFromUrl(
   url: string,
@@ -238,33 +252,112 @@ export async function loadDataFromUrl(
     timestamp: Date.now(),
   })
 
+  // Phase 1: Probe row count
   onProgress?.({
     stage: 'downloading',
-    percent: 20,
-    message: 'Loading data from URL...',
-    timestamp: Date.now(),
-  })
-  onLog?.({
-    level: 'info',
-    message: `Loading ${url}`,
+    percent: 10,
+    message: 'Probing dataset size...',
     timestamp: Date.now(),
   })
 
-  const result = await apiPost<LoadResponse>('/api/motherduck/load', { url })
+  const probe = await apiPost<ProbeResponse>('/api/motherduck/load', {
+    url,
+    action: 'probe',
+  })
+  const totalRows = probe.rowCount
+
+  onLog?.({
+    level: 'info',
+    message: `Dataset has ${totalRows.toLocaleString()} rows`,
+    timestamp: Date.now(),
+  })
+
+  // Phase 2: Load — single or chunked based on row count
+  if (totalRows <= CHUNK_THRESHOLD) {
+    // Small dataset: single load
+    onProgress?.({
+      stage: 'downloading',
+      percent: 20,
+      message: 'Loading data from URL...',
+      timestamp: Date.now(),
+    })
+
+    const result = await apiPost<LoadResponse>('/api/motherduck/load', {
+      url,
+      action: 'load',
+    })
+
+    onProgress?.({
+      stage: 'complete',
+      percent: 100,
+      message: `Loaded ${totalRows.toLocaleString()} rows`,
+      timestamp: Date.now(),
+    })
+    onLog?.({
+      level: 'info',
+      message: `Loaded ${totalRows.toLocaleString()} rows`,
+      timestamp: Date.now(),
+    })
+
+    return { ...result, rowCount: totalRows }
+  }
+
+  // Large dataset: chunked loading
+  const totalChunks = Math.ceil(totalRows / CHUNK_SIZE)
+
+  onLog?.({
+    level: 'info',
+    message: `Large dataset — loading in ${totalChunks} chunks of ${CHUNK_SIZE.toLocaleString()} rows`,
+    timestamp: Date.now(),
+  })
+
+  // Create first chunk
+  onProgress?.({
+    stage: 'downloading',
+    percent: 15,
+    message: `Loading chunk 1/${totalChunks}...`,
+    timestamp: Date.now(),
+  })
+
+  await apiPost<LoadResponse>('/api/motherduck/load', {
+    url,
+    action: 'create',
+    chunkSize: CHUNK_SIZE,
+  })
+
+  // Append remaining chunks
+  for (let i = 1; i < totalChunks; i++) {
+    const offset = i * CHUNK_SIZE
+    const chunkPercent = 15 + Math.round((i / totalChunks) * 80)
+
+    onProgress?.({
+      stage: 'downloading',
+      percent: chunkPercent,
+      message: `Loading chunk ${i + 1}/${totalChunks}...`,
+      timestamp: Date.now(),
+    })
+
+    await apiPost<LoadResponse>('/api/motherduck/load', {
+      url,
+      action: 'append',
+      chunkSize: CHUNK_SIZE,
+      offset,
+    })
+  }
 
   onProgress?.({
     stage: 'complete',
     percent: 100,
-    message: `Loaded ${result.rowCount?.toLocaleString() ?? 0} rows`,
+    message: `Loaded ${totalRows.toLocaleString()} rows`,
     timestamp: Date.now(),
   })
   onLog?.({
     level: 'info',
-    message: `Loaded ${result.rowCount?.toLocaleString() ?? 0} rows`,
+    message: `Loaded ${totalRows.toLocaleString()} rows in ${totalChunks} chunks`,
     timestamp: Date.now(),
   })
 
-  return result
+  return { success: true, rowCount: totalRows }
 }
 
 /**
@@ -335,6 +428,111 @@ export async function executeQuery<T = Record<string, unknown>>(
   }
 
   return response.data as T[]
+}
+
+// ─────────────────────────────────────────────────────────────
+// File Upload Functions
+// ─────────────────────────────────────────────────────────────
+
+interface PresignResponse {
+  success: boolean
+  uploadUrl: string
+  publicUrl: string
+  key: string
+  error?: string | AppError
+}
+
+interface CleanupResponse {
+  success: boolean
+  error?: string | AppError
+}
+
+const SUPPORTED_EXTENSIONS = ['.parquet', '.csv']
+
+/**
+ * Upload a file to R2 via presigned URL.
+ *
+ * Flow: get presigned URL → XHR PUT to R2 → return public URL + key
+ * Uses XMLHttpRequest for upload progress (fetch API doesn't support upload progress).
+ */
+export async function uploadFile(
+  file: File,
+  options?: LoadDataOptions
+): Promise<{ url: string; key: string }> {
+  const { onProgress } = options ?? {}
+
+  // Client-side validation
+  const ext = '.' + file.name.split('.').pop()?.toLowerCase()
+  if (!SUPPORTED_EXTENSIONS.includes(ext)) {
+    throw new Error(`Unsupported file type: ${ext}. Supported: ${SUPPORTED_EXTENSIONS.join(', ')}`)
+  }
+
+  onProgress?.({
+    stage: 'uploading',
+    percent: 5,
+    message: 'Requesting upload URL...',
+    timestamp: Date.now(),
+  })
+
+  // Step 1: Get presigned URL
+  const presign = await apiPost<PresignResponse>('/api/upload/presign', {
+    filename: file.name,
+  })
+
+  onProgress?.({
+    stage: 'uploading',
+    percent: 10,
+    message: 'Uploading file...',
+    timestamp: Date.now(),
+  })
+
+  // Step 2: Upload via XHR PUT (for progress tracking)
+  await new Promise<void>((resolve, reject) => {
+    const xhr = new XMLHttpRequest()
+    xhr.open('PUT', presign.uploadUrl)
+
+    xhr.upload.onprogress = (e) => {
+      if (e.total > 0) {
+        const uploadPercent = 10 + Math.round((e.loaded / e.total) * 80)
+        onProgress?.({
+          stage: 'uploading',
+          percent: uploadPercent,
+          message: `Uploading... ${Math.round((e.loaded / e.total) * 100)}%`,
+          bytesLoaded: e.loaded,
+          bytesTotal: e.total,
+          timestamp: Date.now(),
+        })
+      }
+    }
+
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        resolve()
+      } else {
+        reject(new Error(`Upload failed with status ${xhr.status}`))
+      }
+    }
+
+    xhr.onerror = () => reject(new Error('Upload failed: network error'))
+
+    xhr.send(file)
+  })
+
+  onProgress?.({
+    stage: 'uploading',
+    percent: 95,
+    message: 'Upload complete',
+    timestamp: Date.now(),
+  })
+
+  return { url: presign.publicUrl, key: presign.key }
+}
+
+/**
+ * Delete temporary files from R2 after loading.
+ */
+export async function cleanupUpload(keys: string[]): Promise<void> {
+  await apiPost<CleanupResponse>('/api/upload/cleanup', { keys })
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -1,7 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
-import { loadDataFromUrl, getDashboardData } from '@/lib/api-client'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { loadDataFromUrl, getDashboardData, uploadFile, cleanupUpload } from '@/lib/api-client'
 import { useStore } from '@/lib/store'
 import type { ProgressEvent, LogEntry } from '@/lib/progress'
+
+export type DataSource = string | { type: 'file'; file: File }
 
 interface UseNetflowDataResult {
   loading: boolean
@@ -19,7 +21,7 @@ const initialProgress: ProgressEvent = {
   timestamp: Date.now(),
 }
 
-export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
+export function useNetflowData(source: DataSource): UseNetflowDataResult {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [totalRows, setTotalRows] = useState(0)
@@ -84,17 +86,49 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
     await fetchDashboardData(whereClause || '1=1')
   }, [fetchDashboardData])
 
+  // Stable dependency key for file sources to prevent re-triggering
+  const sourceKey = useMemo(() => {
+    if (typeof source === 'string') return source
+    return `file:${source.file.name}:${source.file.size}:${source.file.lastModified}`
+  }, [source])
+
+  // Determine if there's a source to load
+  const hasSource = typeof source === 'string' ? source.length > 0 : true
+
   useEffect(() => {
-    if (dataLoaded || !parquetUrl) return
+    if (dataLoaded || !hasSource) return
 
     async function loadData() {
+      const keysToCleanup: string[] = []
+
       try {
         setLoading(true)
         setError(null)
         setLogs([])
 
-        // Load parquet via server-side API
-        const result = await loadDataFromUrl(parquetUrl, {
+        let loadUrl: string
+
+        if (typeof source !== 'string') {
+          // File source: upload to R2 first, then load from R2
+          addLog({
+            level: 'info',
+            message: `Uploading ${source.file.name}...`,
+            timestamp: Date.now(),
+          })
+
+          const uploadResult = await uploadFile(source.file, {
+            onProgress: setProgress,
+            onLog: addLog,
+          })
+
+          loadUrl = uploadResult.url
+          keysToCleanup.push(uploadResult.key)
+        } else {
+          loadUrl = source
+        }
+
+        // Load data via server-side API (chunked for large datasets)
+        const result = await loadDataFromUrl(loadUrl, {
           onProgress: setProgress,
           onLog: addLog,
         })
@@ -132,11 +166,18 @@ export function useNetflowData(parquetUrl: string): UseNetflowDataResult {
         })
       } finally {
         setLoading(false)
+        // Clean up temp files regardless of success/failure
+        if (keysToCleanup.length > 0) {
+          cleanupUpload(keysToCleanup).catch((err) => {
+            console.error('Failed to cleanup temp files:', err)
+          })
+        }
       }
     }
 
     loadData()
-  }, [parquetUrl, dataLoaded, fetchDashboardData, addLog])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sourceKey, dataLoaded, fetchDashboardData, addLog, hasSource])
 
   return {
     loading,

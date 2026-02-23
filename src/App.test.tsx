@@ -556,11 +556,11 @@ describe('App', () => {
   })
 
   describe('file drop handling', () => {
-    it('handles file drop (falls back to demo data for now)', async () => {
-      let capturedUrl = ''
+    it('passes file source to useNetflowData on file drop', async () => {
+      let capturedSource: unknown = ''
 
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
-        capturedUrl = url
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
+        capturedSource = source
         return mockDefaultHookReturn()
       })
 
@@ -574,19 +574,18 @@ describe('App', () => {
       })
 
       await waitFor(() => {
-        // Currently falls back to demo URL
-        expect(capturedUrl).toContain('.parquet')
+        expect(capturedSource).toEqual({ type: 'file', file })
       })
     })
 
-    it('shows file name with fallback message', async () => {
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
-        if (url) {
+    it('shows file name during loading', async () => {
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
+        if (typeof source !== 'string' || source) {
           return {
             loading: true,
             error: null,
             totalRows: 0,
-            progress: { stage: 'downloading' as ProgressStage, percent: 50, message: '', timestamp: Date.now() },
+            progress: { stage: 'uploading' as ProgressStage, percent: 50, message: '', timestamp: Date.now() },
             logs: [],
             refresh: vi.fn(),
           }
@@ -604,7 +603,7 @@ describe('App', () => {
       })
 
       await waitFor(() => {
-        expect(screen.getByText(/myflows\.csv.*using demo data/i)).toBeInTheDocument()
+        expect(screen.getByText(/myflows\.csv/i)).toBeInTheDocument()
       })
     })
   })

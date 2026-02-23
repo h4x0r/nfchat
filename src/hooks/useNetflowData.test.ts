@@ -7,6 +7,8 @@ import * as apiClient from '@/lib/api-client'
 vi.mock('@/lib/api-client', () => ({
   loadDataFromUrl: vi.fn(),
   getDashboardData: vi.fn(),
+  uploadFile: vi.fn(),
+  cleanupUpload: vi.fn(),
 }))
 
 describe('useNetflowData', () => {
@@ -159,6 +161,90 @@ describe('useNetflowData', () => {
     it('returns logs array', () => {
       const { result } = renderHook(() => useNetflowData(''))
       expect(result.current.logs).toEqual([])
+    })
+
+    it('handles file source: uploads, loads, then cleans up', async () => {
+      vi.mocked(apiClient.uploadFile).mockResolvedValue({
+        url: 'https://pub.example.com/tmp/test.parquet',
+        key: 'tmp/12345-test.parquet',
+      })
+      vi.mocked(apiClient.cleanupUpload).mockResolvedValue(undefined)
+
+      const file = new File(['data'], 'test.parquet', { type: 'application/octet-stream' })
+      const source = { type: 'file' as const, file }
+
+      const { result } = renderHook(() => useNetflowData(source))
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      // Should have uploaded the file
+      expect(apiClient.uploadFile).toHaveBeenCalledWith(
+        file,
+        expect.objectContaining({ onProgress: expect.any(Function) })
+      )
+      // Should have loaded from the uploaded URL
+      expect(apiClient.loadDataFromUrl).toHaveBeenCalledWith(
+        'https://pub.example.com/tmp/test.parquet',
+        expect.objectContaining({ onProgress: expect.any(Function) })
+      )
+      // Should have cleaned up
+      expect(apiClient.cleanupUpload).toHaveBeenCalledWith(['tmp/12345-test.parquet'])
+    })
+
+    it('file source: error when upload fails', async () => {
+      vi.mocked(apiClient.uploadFile).mockRejectedValue(new Error('Upload failed'))
+
+      const file = new File(['data'], 'test.parquet', { type: 'application/octet-stream' })
+      const source = { type: 'file' as const, file }
+
+      const { result } = renderHook(() => useNetflowData(source))
+
+      await waitFor(() => {
+        expect(result.current.error).toBe('Upload failed')
+      })
+
+      // Should NOT have tried to load data
+      expect(apiClient.loadDataFromUrl).not.toHaveBeenCalled()
+    })
+
+    it('string URL source: uploadFile not called', async () => {
+      const { result } = renderHook(() => useNetflowData('/data/test.parquet'))
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+      })
+
+      expect(apiClient.uploadFile).not.toHaveBeenCalled()
+    })
+
+    it('handles chunked progress from loadDataFromUrl', async () => {
+      // Simulate loadDataFromUrl calling onProgress multiple times (chunked)
+      vi.mocked(apiClient.loadDataFromUrl).mockImplementation(async (_url, options) => {
+        const onProgress = options?.onProgress
+        // Probe phase
+        onProgress?.({ stage: 'downloading', percent: 10, message: 'Probing...', timestamp: Date.now() })
+        // Chunk 1
+        onProgress?.({ stage: 'downloading', percent: 15, message: 'Loading chunk 1/3...', timestamp: Date.now() })
+        // Chunk 2
+        onProgress?.({ stage: 'downloading', percent: 42, message: 'Loading chunk 2/3...', timestamp: Date.now() })
+        // Chunk 3
+        onProgress?.({ stage: 'downloading', percent: 68, message: 'Loading chunk 3/3...', timestamp: Date.now() })
+        // Complete
+        onProgress?.({ stage: 'complete', percent: 100, message: 'Loaded 1,200,000 rows', timestamp: Date.now() })
+        return { success: true, rowCount: 1_200_000 }
+      })
+
+      const { result } = renderHook(() => useNetflowData('/data/large.parquet'))
+
+      await waitFor(() => {
+        expect(result.current.loading).toBe(false)
+        expect(result.current.totalRows).toBe(1_200_000)
+      })
+
+      // Progress should have reached 100 (the hook's own final progress update)
+      expect(result.current.progress.percent).toBe(100)
     })
   })
 })

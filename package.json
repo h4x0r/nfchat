@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@ai-sdk/gateway": "^3.0.16",
+    "@aws-sdk/client-s3": "^3.995.0",
+    "@aws-sdk/s3-request-presigner": "^3.995.0",
     "@duckdb/duckdb-wasm": "^1.33.1-dev16.0",
     "@duckdb/node-api": "^1.4.3-r.3",
     "@motherduck/wasm-client": "^0.8.1",
