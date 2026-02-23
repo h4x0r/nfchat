@@ -93,10 +93,10 @@ describe('App', () => {
 
   describe('demo data loading', () => {
     it('uses external CDN URL when demo clicked', async () => {
-      let capturedUrl = ''
+      let capturedSource: unknown = ''
 
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
-        capturedUrl = url
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
+        capturedSource = source
         return mockDefaultHookReturn()
       })
 
@@ -106,16 +106,16 @@ describe('App', () => {
       fireEvent.click(demoLink)
 
       await waitFor(() => {
-        expect(capturedUrl).toMatch(/^https:\/\//)
-        expect(capturedUrl).toContain('.parquet')
+        expect(capturedSource).toMatch(/^https:\/\//)
+        expect(capturedSource).toContain('.parquet')
       })
     })
 
     it('uses correct demo parquet URL', async () => {
-      let capturedUrl = ''
+      let capturedSource: unknown = ''
 
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
-        capturedUrl = url
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
+        capturedSource = source
         return mockDefaultHookReturn()
       })
 
@@ -125,7 +125,7 @@ describe('App', () => {
       fireEvent.click(demoLink)
 
       await waitFor(() => {
-        expect(capturedUrl).toContain('UWF-ZeekData24.parquet')
+        expect(capturedSource).toContain('UWF-ZeekData24.parquet')
       })
     })
 
@@ -516,13 +516,13 @@ describe('App', () => {
 
     it('resets data source on retry', async () => {
       let callCount = 0
-      let lastUrl = ''
+      let lastSource: unknown = ''
 
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
         callCount++
-        lastUrl = url
+        lastSource = source
 
-        if (url) {
+        if (source) {
           return {
             loading: false,
             error: 'Error',
@@ -549,8 +549,8 @@ describe('App', () => {
 
       await waitFor(() => {
         expect(screen.getByTestId('landing-page')).toBeInTheDocument()
-        // After retry, URL should be empty
-        expect(lastUrl).toBe('')
+        // After retry, source should be empty
+        expect(lastSource).toBe('')
       })
     })
   })
@@ -758,12 +758,12 @@ describe('App', () => {
 
   describe('multiple interactions', () => {
     it('handles demo click after retry', async () => {
-      let urlHistory: string[] = []
+      let sourceHistory: unknown[] = []
 
-      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((url) => {
-        urlHistory.push(url)
+      vi.mocked(useNetflowDataModule.useNetflowData).mockImplementation((source) => {
+        sourceHistory.push(source)
 
-        if (url) {
+        if (source) {
           return {
             loading: false,
             error: 'First error',
@@ -797,7 +797,8 @@ describe('App', () => {
 
       await waitFor(() => {
         // Should have called useNetflowData with URL again
-        expect(urlHistory.filter(u => u.includes('.parquet')).length).toBeGreaterThanOrEqual(2)
+        const urlCalls = sourceHistory.filter(s => typeof s === 'string' && s.includes('.parquet'))
+        expect(urlCalls.length).toBeGreaterThanOrEqual(2)
       })
     })
   })

@@ -261,7 +261,6 @@ describe('API Client', () => {
 
     it('uses chunked loading for large files (>500K rows)', async () => {
       const totalRows = 1_200_000
-      const expectedChunks = Math.ceil(totalRows / CHUNK_SIZE) // 3 chunks
 
       // probe
       mockFetch.mockResolvedValueOnce({

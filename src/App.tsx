@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo, lazy, Suspense } from 'react'
-import { useNetflowData, type DataSource } from '@/hooks/useNetflowData'
+import { useNetflowData, type DataSource as HookDataSource } from '@/hooks/useNetflowData'
 import { LandingPage, type CRTLogEntry } from '@/components/landing/LandingPage'
 import { CRTLoadingLog } from '@/components/landing/CRTLoadingLog'
 import { ErrorBoundary } from '@/components/error'
@@ -43,7 +43,7 @@ function App() {
   const [dataSource, setDataSource] = useState<DataSource>({ type: 'none' })
 
   // Determine source for useNetflowData
-  const hookSource: DataSource = dataSource.type === 'url'
+  const hookSource: HookDataSource = dataSource.type === 'url'
     ? dataSource.url
     : dataSource.type === 'file'
       ? { type: 'file', file: dataSource.file }
