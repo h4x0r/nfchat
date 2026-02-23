@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "buildCommand": "npm run build",
   "devCommand": "vite",
+  "fluid": true,
   "functions": {
     "api/motherduck/*.ts": {
       "maxDuration": 60,
