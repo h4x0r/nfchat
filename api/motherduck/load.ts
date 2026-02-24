@@ -69,6 +69,40 @@ async function executeQuery<T>(sql: string): Promise<T[]> {
 type ValidAction = 'load' | 'probe' | 'create' | 'append' | 'convert'
 const VALID_ACTIONS: ValidAction[] = ['load', 'probe', 'create', 'append', 'convert']
 
+const HEARTBEAT_INTERVAL_MS = 10_000
+
+/**
+ * Run an async operation with NDJSON heartbeat keepalive.
+ *
+ * Sends a newline every 10s to keep the connection alive through
+ * VPNs/proxies with idle TCP timeouts. The final JSON result is
+ * written as the last line. Content-Type is application/x-ndjson.
+ */
+async function withHeartbeat<T>(
+  res: VercelResponse,
+  operation: () => Promise<T>
+): Promise<void> {
+  res.setHeader('Content-Type', 'application/x-ndjson')
+  res.setHeader('Cache-Control', 'no-cache')
+  res.setHeader('X-Accel-Buffering', 'no') // Disable nginx buffering
+
+  const heartbeat = setInterval(() => {
+    res.write('\n')
+  }, HEARTBEAT_INTERVAL_MS)
+
+  try {
+    const result = await operation()
+    clearInterval(heartbeat)
+    res.write(JSON.stringify(result) + '\n')
+    res.end()
+  } catch (error) {
+    clearInterval(heartbeat)
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    res.write(JSON.stringify({ success: false, error: errorMessage }) + '\n')
+    res.end()
+  }
+}
+
 /**
  * Detect reader function from URL extension.
  * MotherDuck handles parsing — no conversion needed.
@@ -205,21 +239,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       case 'load': {
         console.log('[API] Loading data from:', url)
-        const rowCount = await loadData(url)
-        return res.status(200).json({ success: true, rowCount })
+        return withHeartbeat(res, async () => {
+          const rowCount = await loadData(url)
+          return { success: true, rowCount }
+        })
       }
 
       case 'create': {
         const chunkSize = validatePositiveInt(rawChunkSize ?? 500_000, 'chunkSize')
-        const rowCount = await createTableFromChunk(url, chunkSize)
-        return res.status(200).json({ success: true, rowCount })
+        return withHeartbeat(res, async () => {
+          const rowCount = await createTableFromChunk(url, chunkSize)
+          return { success: true, rowCount }
+        })
       }
 
       case 'append': {
         const chunkSize = validatePositiveInt(rawChunkSize ?? 500_000, 'chunkSize')
         const offset = validateNonNegativeInt(rawOffset ?? 0, 'offset')
-        const rowCount = await appendChunk(url, offset, chunkSize)
-        return res.status(200).json({ success: true, rowCount })
+        return withHeartbeat(res, async () => {
+          const rowCount = await appendChunk(url, offset, chunkSize)
+          return { success: true, rowCount }
+        })
       }
 
       case 'convert': {
@@ -229,12 +269,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!parquetKey.startsWith('tmp/')) {
           return res.status(400).json({ success: false, error: 'parquetKey must start with tmp/' })
         }
-        await convertCsvToParquet(url, parquetKey)
-        const publicUrl = process.env.R2_PUBLIC_URL
-        return res.status(200).json({
-          success: true,
-          url: `${publicUrl}/${parquetKey}`,
-          key: parquetKey,
+        return withHeartbeat(res, async () => {
+          await convertCsvToParquet(url, parquetKey)
+          const publicUrl = process.env.R2_PUBLIC_URL
+          return {
+            success: true,
+            url: `${publicUrl}/${parquetKey}`,
+            key: parquetKey,
+          }
         })
       }
     }

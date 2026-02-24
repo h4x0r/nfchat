@@ -427,6 +427,116 @@ describe('API Client', () => {
     })
   })
 
+  describe('NDJSON streaming response (heartbeat keepalive)', () => {
+    /**
+     * Helper: create a mock Response with a ReadableStream body
+     * that yields the given chunks (simulating NDJSON with heartbeats).
+     */
+    function createStreamResponse(chunks: string[], status = 200): Response {
+      const encoder = new TextEncoder()
+      let index = 0
+      const stream = new ReadableStream({
+        pull(controller) {
+          if (index < chunks.length) {
+            controller.enqueue(encoder.encode(chunks[index]))
+            index++
+          } else {
+            controller.close()
+          }
+        },
+      })
+
+      return {
+        ok: status >= 200 && status < 300,
+        status,
+        headers: new Headers({ 'content-type': 'application/x-ndjson' }),
+        body: stream,
+        json: async () => {
+          throw new Error('Should not call json() on NDJSON response')
+        },
+      } as unknown as Response
+    }
+
+    it('parses NDJSON response with heartbeat lines before result', async () => {
+      // Simulate: heartbeat, heartbeat, then JSON result
+      mockFetch
+        // probe — normal JSON
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, rowCount: 100 }),
+        })
+        // load — NDJSON with heartbeats
+        .mockResolvedValueOnce(
+          createStreamResponse([
+            '\n',
+            '\n',
+            '{"success":true,"rowCount":100}\n',
+          ])
+        )
+
+      const { loadDataFromUrl } = await import('./api-client')
+      const result = await loadDataFromUrl('https://example.com/data.parquet')
+
+      expect(result.success).toBe(true)
+      expect(result.rowCount).toBe(100)
+    })
+
+    it('handles NDJSON response with no heartbeats (immediate result)', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, rowCount: 50 }),
+        })
+        .mockResolvedValueOnce(
+          createStreamResponse(['{"success":true,"rowCount":50}\n'])
+        )
+
+      const { loadDataFromUrl } = await import('./api-client')
+      const result = await loadDataFromUrl('https://example.com/data.parquet')
+
+      expect(result.success).toBe(true)
+      expect(result.rowCount).toBe(50)
+    })
+
+    it('throws ApiError when NDJSON result has success:false', async () => {
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, rowCount: 100 }),
+        })
+        .mockResolvedValueOnce(
+          createStreamResponse([
+            '\n',
+            '{"success":false,"error":"MotherDuck timeout"}\n',
+          ])
+        )
+
+      const { loadDataFromUrl, ApiError } = await import('./api-client')
+      await expect(
+        loadDataFromUrl('https://example.com/data.parquet')
+      ).rejects.toThrow(ApiError)
+    })
+
+    it('still handles regular JSON responses (backward compat)', async () => {
+      // Both probe and load return standard JSON (no content-type: application/x-ndjson)
+      mockFetch
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, rowCount: 200 }),
+        })
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ success: true, rowCount: 200 }),
+        })
+
+      const { loadDataFromUrl } = await import('./api-client')
+      const result = await loadDataFromUrl('https://example.com/data.parquet')
+
+      expect(result.success).toBe(true)
+      expect(result.rowCount).toBe(200)
+    })
+  })
+
   describe('uploadFile', () => {
     // XHR behavior control per test
     let xhrBehavior: 'succeed' | 'fail' | 'progress-then-succeed'

@@ -152,6 +152,39 @@ function createRequestKey(endpoint: string, body: Record<string, unknown>): stri
 }
 
 // ─────────────────────────────────────────────────────────────
+// NDJSON Streaming Response Parser
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Parse a newline-delimited JSON (NDJSON) response.
+ *
+ * The server sends heartbeat newlines every 10s to keep the connection
+ * alive through VPNs/proxies with idle timeouts. The final line contains
+ * the actual JSON result. Empty lines (heartbeats) are ignored.
+ */
+async function parseNdjsonResponse(response: Response): Promise<Record<string, unknown>> {
+  const reader = response.body!.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+
+  while (true) {
+    const { done, value } = await reader.read()
+    if (value) {
+      buffer += decoder.decode(value, { stream: !done })
+    }
+    if (done) break
+  }
+
+  // Find the last non-empty line — that's the JSON result
+  const lines = buffer.split('\n').filter(line => line.trim().length > 0)
+  if (lines.length === 0) {
+    throw new Error('Empty NDJSON response')
+  }
+
+  return JSON.parse(lines[lines.length - 1])
+}
+
+// ─────────────────────────────────────────────────────────────
 // Helper
 // ─────────────────────────────────────────────────────────────
 
@@ -184,7 +217,17 @@ async function apiPost<T>(
         body: JSON.stringify(body),
       })
 
-      const data = await response.json()
+      // Detect NDJSON streaming responses (used by load endpoint for heartbeat keepalive)
+      const contentType = response.headers?.get('content-type') ?? ''
+      const isNdjson = contentType.includes('application/x-ndjson')
+
+      let data: Record<string, unknown>
+      if (isNdjson && response.body) {
+        data = await parseNdjsonResponse(response)
+      } else {
+        data = await response.json()
+      }
+
       const elapsed = performance.now() - ctx.startTime
 
       apiLogger.debug('Response', {
